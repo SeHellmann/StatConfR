@@ -63,7 +63,7 @@ test_that("ll_Mratio_cpp matches R across configurations", {
   )
   for (cfg in configs) {
     inputs <- generate_itg_inputs(cfg$nCond, cfg$nRatings, cfg$seed)
-    result <- compare_likelihood_generic(ll_Mratio, ll_Mratio_cpp, inputs)
+    result <- compare_likelihood_generic("ITGc", ll_Mratio, inputs)
     expect_true(result$match,
       info = sprintf("nCond=%d nRatings=%d seed=%d: R=%f C++=%f diff=%e",
                      cfg$nCond, cfg$nRatings, cfg$seed,
@@ -75,7 +75,7 @@ test_that("ll_Mratio_cpp handles edge cases", {
   base <- generate_itg_inputs(nCond = 2, nRatings = 4, seed = 123)
   for (nm in names(itg_edge_cases)) {
     inputs <- itg_edge_cases[[nm]](base)
-    result <- compare_likelihood_generic(ll_Mratio, ll_Mratio_cpp, inputs, tolerance = 1e-8)
+    result <- compare_likelihood_generic("ITGc", ll_Mratio, inputs, tolerance = 1e-8)
     expect_true(is.finite(result$cpp_result), info = sprintf("'%s': result not finite", nm))
     expect_true(result$match,
       info = sprintf("'%s': R=%f C++=%f diff=%e", nm, result$r_result, result$cpp_result, result$difference))
@@ -85,7 +85,8 @@ test_that("ll_Mratio_cpp handles edge cases", {
 test_that("ll_Mratio_cpp output is finite, non-negative, and deterministic", {
   inputs <- generate_itg_inputs(nCond = 2, nRatings = 4, seed = 123)
   call_cpp <- function(inp) {
-    ll_Mratio_cpp(inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
+    ptr <- get_itgc_ptr()
+    test_ll_ptr(ptr, inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
   }
   r1 <- call_cpp(inputs)
   expect_true(is.finite(r1))
@@ -104,7 +105,7 @@ test_that("ll_MratioF_cpp matches R across configurations", {
   )
   for (cfg in configs) {
     inputs <- generate_itg_inputs(cfg$nCond, cfg$nRatings, cfg$seed)
-    result <- compare_likelihood_generic(ll_MratioF, ll_MratioF_cpp, inputs)
+    result <- compare_likelihood_generic("ITGcm", ll_MratioF, inputs)
     expect_true(result$match,
       info = sprintf("nCond=%d nRatings=%d seed=%d: R=%f C++=%f diff=%e",
                      cfg$nCond, cfg$nRatings, cfg$seed,
@@ -116,7 +117,7 @@ test_that("ll_MratioF_cpp handles edge cases", {
   base <- generate_itg_inputs(nCond = 2, nRatings = 4, seed = 123)
   for (nm in names(itg_edge_cases)) {
     inputs <- itg_edge_cases[[nm]](base)
-    result <- compare_likelihood_generic(ll_MratioF, ll_MratioF_cpp, inputs, tolerance = 1e-8)
+    result <- compare_likelihood_generic("ITGcm", ll_MratioF, inputs, tolerance = 1e-8)
     expect_true(is.finite(result$cpp_result), info = sprintf("'%s': result not finite", nm))
     expect_true(result$match,
       info = sprintf("'%s': R=%f C++=%f diff=%e", nm, result$r_result, result$cpp_result, result$difference))
@@ -126,7 +127,8 @@ test_that("ll_MratioF_cpp handles edge cases", {
 test_that("ll_MratioF_cpp output is finite, non-negative, and deterministic", {
   inputs <- generate_itg_inputs(nCond = 2, nRatings = 4, seed = 123)
   call_cpp <- function(inp) {
-    ll_MratioF_cpp(inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
+    ptr <- get_itgcm_ptr()
+    test_ll_ptr(ptr, inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
   }
   r1 <- call_cpp(inputs)
   expect_true(is.finite(r1))
@@ -137,8 +139,8 @@ test_that("ll_MratioF_cpp output is finite, non-negative, and deterministic", {
 test_that("Mratio and MratioF give distinct but valid results at m_ratio = 1", {
   inputs <- generate_itg_inputs(nCond = 2, nRatings = 4, seed = 123)
   inputs$p[inputs$nCond + 2 * inputs$nRatings] <- 0  # log(1)
-  r_mratio  <- ll_Mratio_cpp( inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond)
-  r_mratiof <- ll_MratioF_cpp(inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond)
+  r_mratio  <- test_ll_ptr(get_itgc_ptr(),  inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond)
+  r_mratiof <- test_ll_ptr(get_itgcm_ptr(), inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond)
   expect_true(is.finite(r_mratio)  && r_mratio  >= 0)
   expect_true(is.finite(r_mratiof) && r_mratiof >= 0)
 })
@@ -148,7 +150,7 @@ test_that("ll_Mratio_cpp matches R across parameter grid", {
     for (nRatings in 2:5) {
       for (seed in c(111, 222, 333)) {
         inputs <- generate_itg_inputs(nCond, nRatings, seed)
-        result <- compare_likelihood_generic(ll_Mratio, ll_Mratio_cpp, inputs)
+        result <- compare_likelihood_generic("ITGc", ll_Mratio, inputs)
         expect_true(result$match,
           info = sprintf("nCond=%d, nRatings=%d, seed=%d: diff=%e",
                          nCond, nRatings, seed, result$difference))
@@ -162,7 +164,7 @@ test_that("ll_MratioF_cpp matches R across parameter grid", {
     for (nRatings in 2:5) {
       for (seed in c(111, 222, 333)) {
         inputs <- generate_itg_inputs(nCond, nRatings, seed)
-        result <- compare_likelihood_generic(ll_MratioF, ll_MratioF_cpp, inputs)
+        result <- compare_likelihood_generic("ITGcm", ll_MratioF, inputs)
         expect_true(result$match,
           info = sprintf("nCond=%d, nRatings=%d, seed=%d: diff=%e",
                          nCond, nRatings, seed, result$difference))
@@ -177,7 +179,10 @@ test_that("ll_Mratio_cpp is faster than R version", {
   inputs <- generate_itg_inputs(nCond = 3, nRatings = 5, seed = 123)
   n_iter <- 100
   r_time   <- system.time(for (i in seq_len(n_iter)) ll_Mratio(inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond))["elapsed"]
-  cpp_time <- system.time(for (i in seq_len(n_iter)) ll_Mratio_cpp(inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond))["elapsed"]
+  cpp_time <- system.time(for (i in seq_len(n_iter)) {
+    ptr <- get_itgc_ptr()
+    test_ll_ptr(ptr, inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond)
+  })["elapsed"]
   message(sprintf("ll_Mratio - R: %.3fs, C++: %.3fs, speedup: %.1fx", r_time, cpp_time, r_time / cpp_time))
   expect_true(cpp_time < r_time, info = sprintf("R: %.3fs, C++: %.3fs", r_time, cpp_time))
 })
@@ -188,7 +193,10 @@ test_that("ll_MratioF_cpp is faster than R version", {
   inputs <- generate_itg_inputs(nCond = 3, nRatings = 5, seed = 123)
   n_iter <- 100
   r_time   <- system.time(for (i in seq_len(n_iter)) ll_MratioF(inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond))["elapsed"]
-  cpp_time <- system.time(for (i in seq_len(n_iter)) ll_MratioF_cpp(inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond))["elapsed"]
+  cpp_time <- system.time(for (i in seq_len(n_iter)) {
+    ptr <- get_itgcm_ptr()
+    test_ll_ptr(ptr, inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond)
+  })["elapsed"]
   message(sprintf("ll_MratioF - R: %.3fs, C++: %.3fs, speedup: %.1fx", r_time, cpp_time, r_time / cpp_time))
   expect_true(cpp_time < r_time, info = sprintf("R: %.3fs, C++: %.3fs", r_time, cpp_time))
 })

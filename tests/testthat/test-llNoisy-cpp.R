@@ -68,7 +68,7 @@ test_that("ll_Noisy_cpp matches R across configurations", {
   for (cfg in configs) {
     inputs <- generate_noisy_inputs(cfg$nCond, cfg$nRatings, cfg$seed)
     tol <- if (!is.null(cfg$tol)) cfg$tol else 1e-4
-    result <- compare_likelihood_generic(ll_Noisy, ll_Noisy_cpp, inputs, tolerance = tol)
+    result <- compare_likelihood_generic("Noisy", ll_Noisy, inputs, tolerance = tol)
     expect_true(result$match,
       info = sprintf("nCond=%d nRatings=%d seed=%d: R=%f C++=%f diff=%e",
                      cfg$nCond, cfg$nRatings, cfg$seed,
@@ -80,7 +80,7 @@ test_that("ll_Noisy_cpp handles edge cases", {
   base <- generate_noisy_inputs(nCond = 2, nRatings = 4, seed = 123)
   for (nm in names(noisy_edge_cases)) {
     inputs <- noisy_edge_cases[[nm]](base)
-    result <- compare_likelihood_generic(ll_Noisy, ll_Noisy_cpp, inputs, tolerance = 1e-4)
+    result <- compare_likelihood_generic("Noisy", ll_Noisy, inputs, tolerance = 1e-4)
     expect_true(is.finite(result$cpp_result), info = sprintf("'%s': result not finite", nm))
     expect_true(result$match,
       info = sprintf("'%s': R=%f C++=%f diff=%e", nm, result$r_result, result$cpp_result, result$difference))
@@ -90,7 +90,8 @@ test_that("ll_Noisy_cpp handles edge cases", {
 test_that("ll_Noisy_cpp output is finite, non-negative, and deterministic", {
   inputs <- generate_noisy_inputs(nCond = 2, nRatings = 4, seed = 123)
   call_cpp <- function(inp) {
-    ll_Noisy_cpp(inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
+    ptr <- get_noisy_ptr()
+    test_ll_ptr(ptr, inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
   }
   r1 <- call_cpp(inputs)
   expect_true(is.finite(r1))
@@ -103,7 +104,7 @@ test_that("ll_Noisy_cpp matches R across parameter grid", {
     for (nRatings in 2:5) {
       for (seed in c(111, 222, 333)) {
         inputs <- generate_noisy_inputs(nCond, nRatings, seed)
-        result <- compare_likelihood_generic(ll_Noisy, ll_Noisy_cpp, inputs, tolerance = 1e-3)
+        result <- compare_likelihood_generic("Noisy", ll_Noisy, inputs, tolerance = 1e-3)
         expect_true(result$match,
           info = sprintf("nCond=%d, nRatings=%d, seed=%d: diff=%e",
                          nCond, nRatings, seed, result$difference))
@@ -118,7 +119,10 @@ test_that("ll_Noisy_cpp is faster than R version", {
   inputs <- generate_noisy_inputs(nCond = 3, nRatings = 5, seed = 123)
   n_iter <- 50
   r_time   <- system.time(for (i in seq_len(n_iter)) ll_Noisy(inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond))["elapsed"]
-  cpp_time <- system.time(for (i in seq_len(n_iter)) ll_Noisy_cpp(inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond))["elapsed"]
+  cpp_time <- system.time(for (i in seq_len(n_iter)) {
+    ptr <- get_noisy_ptr()
+    test_ll_ptr(ptr, inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond)
+  })["elapsed"]
   message(sprintf("ll_Noisy - R: %.3fs, C++: %.3fs, speedup: %.1fx", r_time, cpp_time, r_time / cpp_time))
   expect_true(cpp_time < r_time, info = sprintf("R: %.3fs, C++: %.3fs", r_time, cpp_time))
 })

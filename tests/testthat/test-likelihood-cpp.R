@@ -14,17 +14,17 @@ test_that("all C++ likelihood functions return finite, non-negative values", {
   p_ext <- rnorm(nCond + 2 * nRatings + 1, sd = 0.5)
 
   fns <- list(
-    ll_SDT_cpp     = function() ll_SDT_cpp(    p_sdt, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
-    ll_Mratio_cpp  = function() ll_Mratio_cpp( p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
-    ll_MratioF_cpp = function() ll_MratioF_cpp(p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
-    ll_2Chan_cpp   = function() ll_2Chan_cpp(  p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
-    ll_CEV_cpp     = function() ll_CEV_cpp(    p_ext, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
-    ll_LogNorm_cpp = function() ll_LogNorm_cpp(p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
-    ll_LogWEV_cpp  = function() ll_LogWEV_cpp( p_ext, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
-    ll_Noisy_cpp   = function() ll_Noisy_cpp(  p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
-    ll_PDA_cpp     = function() ll_PDA_cpp(    p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
-    ll_CAS_cpp     = function() ll_CAS_cpp(    p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
-    ll_SDTvarS_cpp = function() ll_SDTvarS_cpp(p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)
+    ll_SDT_cpp     = function() test_ll_ptr(get_sdt_ptr(),     p_sdt, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    ll_Mratio_cpp  = function() test_ll_ptr(get_itgc_ptr(),    p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    ll_MratioF_cpp = function() test_ll_ptr(get_itgcm_ptr(),   p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    ll_2Chan_cpp   = function() test_ll_ptr(get_2chan_ptr(),   p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    ll_CEV_cpp     = function() test_ll_ptr(get_cev_ptr(),     p_ext, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    ll_LogNorm_cpp = function() test_ll_ptr(get_lognorm_ptr(), p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    ll_LogWEV_cpp  = function() test_ll_ptr(get_logwev_ptr(),  p_ext, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    ll_Noisy_cpp   = function() test_ll_ptr(get_noisy_ptr(),   p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    ll_PDA_cpp     = function() test_ll_ptr(get_pda_ptr(),     p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    ll_CAS_cpp     = function() test_ll_ptr(get_cas_ptr(),     p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    ll_SDTvarS_cpp = function() test_ll_ptr(get_sdtvars_ptr(), p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)
   )
   for (nm in names(fns)) {
     val <- fns[[nm]]()
@@ -42,19 +42,19 @@ test_that("C++ functions handle edge cases: single condition and minimum ratings
     p_itg <- rnorm(nCond + 2 * nRatings,     sd = 0.5)
     p_ext <- rnorm(nCond + 2 * nRatings + 1, sd = 0.5)
 
-    expect_true(is.finite(ll_SDT_cpp(    p_sdt, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
-    expect_true(is.finite(ll_Mratio_cpp( p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
-    expect_true(is.finite(ll_MratioF_cpp(p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
+    expect_true(is.finite(test_ll_ptr(get_sdt_ptr(),     p_sdt, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
+    expect_true(is.finite(test_ll_ptr(get_itgc_ptr(),    p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
+    expect_true(is.finite(test_ll_ptr(get_itgcm_ptr(),   p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
     # 2Chan: R reference p[3:2] at nRatings=2; skip that config
     if (nRatings >= 3)
-      expect_true(is.finite(ll_2Chan_cpp(p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
-    expect_true(is.finite(ll_CEV_cpp(    p_ext, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
-    expect_true(is.finite(ll_LogNorm_cpp(p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
-    expect_true(is.finite(ll_LogWEV_cpp( p_ext, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
-    expect_true(is.finite(ll_Noisy_cpp(  p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
-    expect_true(is.finite(ll_PDA_cpp(    p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
-    expect_true(is.finite(ll_CAS_cpp(    p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
-    expect_true(is.finite(ll_SDTvarS_cpp(p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
+      expect_true(is.finite(test_ll_ptr(get_2chan_ptr(), p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
+    expect_true(is.finite(test_ll_ptr(get_cev_ptr(),     p_ext, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
+    expect_true(is.finite(test_ll_ptr(get_lognorm_ptr(), p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
+    expect_true(is.finite(test_ll_ptr(get_logwev_ptr(),  p_ext, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
+    expect_true(is.finite(test_ll_ptr(get_noisy_ptr(),   p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
+    expect_true(is.finite(test_ll_ptr(get_pda_ptr(),     p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
+    expect_true(is.finite(test_ll_ptr(get_cas_ptr(),     p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
+    expect_true(is.finite(test_ll_ptr(get_sdtvars_ptr(), p_itg, counts$N_SA_RA, counts$N_SA_RB, counts$N_SB_RA, counts$N_SB_RB, nRatings, nCond)))
   }
 })
 
@@ -68,17 +68,17 @@ test_that("C++ functions handle sparse count matrices", {
   p_itg <- rnorm(nCond + 2 * nRatings,     sd = 0.5)
   p_ext <- rnorm(nCond + 2 * nRatings + 1, sd = 0.5)
 
-  expect_true(is.finite(ll_SDT_cpp(    p_sdt, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
-  expect_true(is.finite(ll_Mratio_cpp( p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
-  expect_true(is.finite(ll_MratioF_cpp(p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
-  expect_true(is.finite(ll_2Chan_cpp(  p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
-  expect_true(is.finite(ll_CEV_cpp(    p_ext, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
-  expect_true(is.finite(ll_LogNorm_cpp(p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
-  expect_true(is.finite(ll_LogWEV_cpp( p_ext, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
-  expect_true(is.finite(ll_Noisy_cpp(  p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
-  expect_true(is.finite(ll_PDA_cpp(    p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
-  expect_true(is.finite(ll_CAS_cpp(    p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
-  expect_true(is.finite(ll_SDTvarS_cpp(p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
+  expect_true(is.finite(test_ll_ptr(get_sdt_ptr(),     p_sdt, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
+  expect_true(is.finite(test_ll_ptr(get_itgc_ptr(),    p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
+  expect_true(is.finite(test_ll_ptr(get_itgcm_ptr(),   p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
+  expect_true(is.finite(test_ll_ptr(get_2chan_ptr(),   p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
+  expect_true(is.finite(test_ll_ptr(get_cev_ptr(),     p_ext, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
+  expect_true(is.finite(test_ll_ptr(get_lognorm_ptr(), p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
+  expect_true(is.finite(test_ll_ptr(get_logwev_ptr(),  p_ext, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
+  expect_true(is.finite(test_ll_ptr(get_noisy_ptr(),   p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
+  expect_true(is.finite(test_ll_ptr(get_pda_ptr(),     p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
+  expect_true(is.finite(test_ll_ptr(get_cas_ptr(),     p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
+  expect_true(is.finite(test_ll_ptr(get_sdtvars_ptr(), p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)))
 })
 
 test_that("all C++ likelihoods match R implementations across standard configurations", {
@@ -100,41 +100,41 @@ test_that("all C++ likelihoods match R implementations across standard configura
     lbl   <- sprintf("nCond=%d, nRatings=%d", nCond, nRatings)
 
     # Closed-form models: exact agreement expected
-    expect_equal(ll_SDT_cpp(    p_sdt, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    expect_equal(test_ll_ptr(get_sdt_ptr(),     p_sdt, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  llSDT(         p_sdt, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  tolerance = 1e-10, info = paste("SDT", lbl))
-    expect_equal(ll_Mratio_cpp( p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    expect_equal(test_ll_ptr(get_itgc_ptr(),    p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  ll_Mratio(     p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  tolerance = 1e-10, info = paste("Mratio", lbl))
-    expect_equal(ll_MratioF_cpp(p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    expect_equal(test_ll_ptr(get_itgcm_ptr(),   p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  ll_MratioF(    p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  tolerance = 1e-10, info = paste("MratioF", lbl))
     # 2Chan: R reference p[3:2] at nRatings=2; skip that config
     if (nRatings >= 3)
-      expect_equal(ll_2Chan_cpp(p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+      expect_equal(test_ll_ptr(get_2chan_ptr(), p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                    ll2Chan(     p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                    tolerance = 1e-10, info = paste("2Chan", lbl))
-    expect_equal(ll_SDTvarS_cpp(p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    expect_equal(test_ll_ptr(get_sdtvars_ptr(), p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  llSDTvarS(     p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  tolerance = 1e-10, info = paste("SDTvarS", lbl))
 
     # Integration-based models: lower tolerance allow small numerical differences
-    expect_equal(ll_CEV_cpp(    p_ext, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    expect_equal(test_ll_ptr(get_cev_ptr(),     p_ext, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  ll_CEV(        p_ext, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  tolerance = 1e-4, info = paste("CEV", lbl))
-    expect_equal(ll_LogNorm_cpp(p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    expect_equal(test_ll_ptr(get_lognorm_ptr(), p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  ll_lognorm(    p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  tolerance = 1e-4, info = paste("LogNorm", lbl))
-    expect_equal(ll_LogWEV_cpp( p_ext, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    expect_equal(test_ll_ptr(get_logwev_ptr(),  p_ext, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  ll_LogWEV(     p_ext, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  tolerance = 1e-4, info = paste("LogWEV", lbl))
-    expect_equal(ll_Noisy_cpp(  p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    expect_equal(test_ll_ptr(get_noisy_ptr(),   p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  ll_Noisy(      p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  tolerance = 1e-4, info = paste("Noisy", lbl))
-    expect_equal(ll_PDA_cpp(    p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    expect_equal(test_ll_ptr(get_pda_ptr(),     p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  ll_PDA(        p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  tolerance = 1e-4, info = paste("PDA", lbl))
-    expect_equal(ll_CAS_cpp(    p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
+    expect_equal(test_ll_ptr(get_cas_ptr(),     p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  ll_CAS(        p_itg, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond),
                  tolerance = 1e-4, info = paste("CAS", lbl))
   }
