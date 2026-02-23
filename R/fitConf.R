@@ -230,7 +230,7 @@
 #' @export
 fitConf <- function(data, model = "SDT",
                   #  diffCond = NULL, stimulus = NULL, correct = NULL, rating = NULL,
-                    nInits = 5, nRestart = 4) {
+                    nInits = 5, nRestart = 4, formulas = NULL, fast = FALSE) {
   # if (!is.null(diffCond)) data$diffCond <- data[,diffCond]
   # if (!is.null(stimulus)) data$stimulus <- data[,stimulus]
   # if (!is.null(correct)) data$correct <- data[,correct]
@@ -253,12 +253,42 @@ fitConf <- function(data, model = "SDT",
   }
   if(!all(data$correct %in% c(0,1))) stop("correct should be 1 or 0")
 
+  if (!is.null(formulas)) {
+    if (model == "WEV") {
+      fitting_fct <- fitCEV_regression
+    } else if (model=="SDT") {
+      fitting_fct <- fitSDT_regression
+    } else if (model=="IG") {
+      fitting_fct <- fit2Chan_regression
+    } else if (model=="ITGc") {
+      fitting_fct <- fitITGc_regression
+    } else if (model=="ITGcm") {
+      fitting_fct <- fitITGcm_regression
+    } else if (model=="GN") {
+      fitting_fct <- fitNoisy_regression
+    } else if (model=="PDA") {
+      fitting_fct <- fitPDA_regression
+    } else if (model=="logN") {
+      fitting_fct <- fitLognorm_regression
+    } else if (model == "logWEV"){
+      fitting_fct <- fitLogWEV_regression
+    } else if (model == "RCE"){
+      fitting_fct <- fitRCE_regression
+    } else if (model == "CAS"){
+      fitting_fct <- fitCAS_regression
+    } else {
+      stop(paste0("Regression for model '", model, "' is not implemented yet."))
+    }
+    fit <- fitting_fct(data, formulas, nInits, nRestart)
+    return (fit)
+  }
+
   A <- levels(data$stimulus)[1]
   B <- levels(data$stimulus)[2]
   nCond <- length(levels(data$diffCond))
   nRatings <-  length(levels(data$rating))
   nTrials <- length(data$rating)
-  abj_f <- 1 /(nRatings*2)
+  abj_f <- 0#1 /(nRatings*2)
 
   N_SA_RA <-
     table(data$diffCond[data$stimulus == A & data$correct == 1],
@@ -273,29 +303,58 @@ fitConf <- function(data, model = "SDT",
     table(data$diffCond[data$stimulus == B & data$correct == 1],
           data$rating[data$stimulus == B & data$correct == 1]) + abj_f
 
-  if (model == "WEV") {
-    fitting_fct <- fitCEV
-  } else if (model=="SDT") {
-    fitting_fct <- fitSDT
-  } else if (model=="IG") {
-    fitting_fct <- fit2Chan
-  } else if (model=="ITGc") {
-    fitting_fct <- fitITGc
-  } else if (model=="ITGcm") {
-    fitting_fct <- fitITGcm
-  } else if (model=="GN") {
-    fitting_fct <- fitNoisy
-  } else if (model=="PDA") {
-    fitting_fct <- fitPDA
-  } else if (model=="logN") {
-    fitting_fct <- fitLognorm
-  } else if (model == "logWEV"){
-    fitting_fct <- fitLogWEV
-  } else if (model == "RCE"){
-    fitting_fct <- fitRCE
-  } else if (model == "CAS"){
-    fitting_fct <- fitCAS
-  } else stop(paste0("Model: ", model, " not implemented!\nChoose one of: 'WEV', 'SDT', 'IG', 'ITGc', 'ITGcm, 'GN', 'CAS', 'logN', 'logWEV', 'RCE', or 'PDA'"))
+  fitting_fct <- NULL
+  if (fast) {
+    if (model == "WEV") {
+      fitting_fct <- fitCEV_fast
+    } else if (model=="SDT") {
+      fitting_fct <- fitSDT_fast
+    } else if (model=="IG") {
+      fitting_fct <- fit2Chan_fast
+    } else if (model=="ITGc") {
+      fitting_fct <- fitITGc_fast
+    } else if (model=="ITGcm") {
+      fitting_fct <- fitITGcm_fast
+    } else if (model=="GN") {
+      fitting_fct <- fitNoisy_fast
+    } else if (model=="PDA") {
+      fitting_fct <- fitPDA_fast
+    } else if (model=="logN") {
+      fitting_fct <- fitLognorm_fast
+    } else if (model == "logWEV"){
+      fitting_fct <- fitLogWEV_fast
+    } else if (model == "RCE"){
+      fitting_fct <- fitRCE_fast
+    } else if (model == "CAS"){
+      fitting_fct <- fitCAS_fast
+    } else {
+      stop(paste0("Fast version for model '", model, "' is not implemented yet."))
+    }
+  } else {
+    if (model == "WEV") {
+      fitting_fct <- fitCEV
+    } else if (model=="SDT") {
+      fitting_fct <- fitSDT
+    } else if (model=="IG") {
+      fitting_fct <- fit2Chan
+    } else if (model=="ITGc") {
+      fitting_fct <- fitITGc
+    } else if (model=="ITGcm") {
+      fitting_fct <- fitITGcm
+    } else if (model=="GN") {
+      fitting_fct <- fitNoisy
+    } else if (model=="PDA") {
+      fitting_fct <- fitPDA
+    } else if (model=="logN") {
+      fitting_fct <- fitLognorm
+    } else if (model == "logWEV"){
+      fitting_fct <- fitLogWEV
+    } else if (model == "RCE"){
+      fitting_fct <- fitRCE
+    } else if (model == "CAS"){
+      fitting_fct <- fitCAS
+    } else stop(paste0("Model: ", model, " not implemented!\nChoose one of: 'WEV', 'SDT', 'IG', 'ITGc', 'ITGcm, 'GN', 'CAS', 'logN', 'logWEV', 'RCE', or 'PDA'"))
+  }  
 
   fit <- fitting_fct(N_SA_RA = N_SA_RA,N_SA_RB = N_SA_RB,
                      N_SB_RA = N_SB_RA,N_SB_RB = N_SB_RB,
