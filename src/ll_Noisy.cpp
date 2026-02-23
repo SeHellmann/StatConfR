@@ -2,6 +2,8 @@
 #include "utils.h"
 #include <RcppNumerical.h>
 
+using namespace arma;
+using namespace Rcpp;
 using namespace Numer;
 
 class NoisyIntegrand : public Func
@@ -27,9 +29,13 @@ public:
     }
 };
 
-// [[Rcpp::export]]
-double ll_Noisy_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::mat& N_SA_RB, const arma::mat& N_SB_RA,
-        const arma::mat& N_SB_RB, int nRatings, int nCond) {
+double ll_Noisy_cpp(const arma::vec& p, const ModelData& dat) {
+    const arma::mat& N_SA_RA = dat.N_SA_RA;
+    const arma::mat& N_SA_RB = dat.N_SA_RB;
+    const arma::mat& N_SB_RA = dat.N_SB_RA;
+    const arma::mat& N_SB_RB = dat.N_SB_RB;
+    int nRatings = dat.nRatings;
+    int nCond = dat.nCond;
     
     const arma::vec ds = compute_sensitivity(p, nCond);
     const arma::vec locA = -ds / 2.0;
@@ -144,4 +150,35 @@ double ll_Noisy_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::ma
     }
     return compute_negLogL(p_SA_RA, p_SA_RB, p_SB_RA, p_SB_RB,
         N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB);
+}
+
+
+double ll_Noisy_regression(const vec& p, const RegressionData& dat) {
+    int n_meta = 1;
+
+    auto calc_prob = [](bool resp_A, double loc, double theta, 
+                        double lower_bound, double upper_bound, 
+                        double d, const std::vector<double>& m) {
+        double sigma = std::exp(m[0]);
+
+        double adj_upper = (resp_A && upper_bound == theta) ? arma::datum::inf : upper_bound;
+        double adj_lower = (!resp_A && lower_bound == theta) ? -arma::datum::inf : lower_bound;
+        
+        NoisyIntegrand f;
+        f.set_params(loc, adj_lower, adj_upper, sigma);
+        
+        double err_est; 
+        int err_code;
+        const double tol = 1e-8;
+        const int max_subdiv = 100;
+        
+        // Based on Response A or B, the underlying signal variable x lies in (-Inf, theta] or [theta, Inf)
+        if (resp_A) {
+            return Numer::integrate(f, -arma::datum::inf, theta, err_est, err_code, max_subdiv, tol, tol);
+        } else {
+            return Numer::integrate(f, theta, arma::datum::inf, err_est, err_code, max_subdiv, tol, tol);
+        }
+    };
+
+    return compute_regression_negLogL(p, dat, n_meta, calc_prob);
 }

@@ -2,6 +2,8 @@
 #include "utils.h"
 #include <RcppNumerical.h>
 
+using namespace arma;
+using namespace Rcpp;
 using namespace Numer;
 
 // Integrate theta to +Inf
@@ -63,9 +65,14 @@ public:
     }
 };
 
- // [[Rcpp::export]]
-double ll_LogNorm_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::mat& N_SA_RB, const arma::mat& N_SB_RA,
-        const arma::mat& N_SB_RB, int nRatings, int nCond){
+
+double ll_LogNorm_cpp(const arma::vec& p, const ModelData& dat) {
+    const arma::mat& N_SA_RA = dat.N_SA_RA;
+    const arma::mat& N_SA_RB = dat.N_SA_RB;
+    const arma::mat& N_SB_RA = dat.N_SB_RA;
+    const arma::mat& N_SB_RB = dat.N_SB_RB;
+    int nRatings = dat.nRatings;
+    int nCond = dat.nCond;
     
     const arma::vec ds = compute_sensitivity(p, nCond);
     const arma::vec locA = -ds / 2.0;
@@ -147,4 +154,43 @@ double ll_LogNorm_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::
     }
     return compute_negLogL(p_SA_RA, p_SA_RB, p_SB_RA, p_SB_RB,
         N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB);
+}
+
+
+double ll_LogNorm_regression(const vec& p, const RegressionData& dat) {
+    int n_meta = 1;
+    
+    auto calc_prob = [](bool resp_A, double loc, double theta, 
+                        double lower_bound, double upper_bound, 
+                        double d, const std::vector<double>& m) {
+        
+        double sigma = std::exp(m[0]);
+        double sigma2_div2 = 0.5 * sigma * sigma;
+        
+        double err_est; 
+        int err_code;
+        const double tol = 1e-8;
+        const int max_subdiv = 100;
+        
+        if (resp_A) {
+            // Distance is (theta - bound).
+            double loc_lo = std::isinf(lower_bound) ? arma::datum::inf : std::log(theta - lower_bound) - sigma2_div2;
+            double loc_hi = (upper_bound == theta) ? -arma::datum::inf : std::log(theta - upper_bound) - sigma2_div2;
+            
+            LogNormIntegrand_RA f_ra;
+            f_ra.set_params(loc, loc_lo, loc_hi, sigma, theta);
+            return integrate(f_ra, -arma::datum::inf, theta, err_est, err_code, max_subdiv, tol, tol);
+            
+        } else {
+            // Distance is (bound - theta).
+            double loc_lo = (lower_bound == theta) ? -arma::datum::inf : std::log(lower_bound - theta) - sigma2_div2;
+            double loc_hi = std::isinf(upper_bound) ? arma::datum::inf : std::log(upper_bound - theta) - sigma2_div2;
+            
+            LogNormIntegrand_RB f_rb;
+            f_rb.set_params(loc, loc_lo, loc_hi, sigma, theta);
+            return integrate(f_rb, theta, arma::datum::inf, err_est, err_code, max_subdiv, tol, tol);
+        }
+    };
+    
+    return compute_regression_negLogL(p, dat, n_meta, calc_prob);
 }

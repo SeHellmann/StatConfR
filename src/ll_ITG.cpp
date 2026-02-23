@@ -2,9 +2,16 @@
 #include "likelihoods_func.h"
 #include "utils.h"
 
+using namespace arma;
+using namespace Rcpp;
 
-static double ll_Mratio_helper(const arma::vec& p, const arma::mat& N_SA_RA, const arma::mat& N_SA_RB,
-        const arma::mat& N_SB_RA, const arma::mat& N_SB_RB, int nRatings, int nCond, bool fleming){
+static double ll_Mratio_helper(const arma::vec& p, const ModelData& dat, bool fleming){
+    const arma::mat& N_SA_RA = dat.N_SA_RA;
+    const arma::mat& N_SA_RB = dat.N_SA_RB;
+    const arma::mat& N_SB_RA = dat.N_SB_RA;
+    const arma::mat& N_SB_RB = dat.N_SB_RB;
+    int nRatings = dat.nRatings;
+    int nCond = dat.nCond;
 
     const arma::vec ds = compute_sensitivity(p, nCond);
     const double theta = p(nCond + nRatings - 1);
@@ -88,16 +95,48 @@ static double ll_Mratio_helper(const arma::vec& p, const arma::mat& N_SA_RA, con
     return negLogL;
 }
 
+double ll_Mratio_cpp(const arma::vec& p, const ModelData& dat){
+    return ll_Mratio_helper(p, dat, false);
+}
+
+double ll_MratioF_cpp(const arma::vec& p, const ModelData& dat){
+    return ll_Mratio_helper(p, dat, true);
+}
 
 
-// [[Rcpp::export]]
-double ll_Mratio_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::mat& N_SA_RB, const arma::mat& N_SB_RA,
-        const arma::mat& N_SB_RB, int nRatings, int nCond){
-        return ll_Mratio_helper(p, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond, false);
-        }
+static double ll_Mratio_regression_helper(const vec& p, const RegressionData& dat, bool fleming) {
+    int n_meta = 1;
+    
+    auto calc_prob = [fleming](bool resp_A, double loc, double theta, 
+                               double lower_bound, double upper_bound, 
+                               double d, const std::vector<double>& m) {
 
-// [[Rcpp::export]]
-double ll_MratioF_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::mat& N_SA_RB, const arma::mat& N_SB_RA,
-        const arma::mat& N_SB_RB, int nRatings, int nCond){
-        return ll_Mratio_helper(p, N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond, true);
+        double m_ratio = std::exp(m[0]);
+
+        double loc2 = loc * m_ratio;
+        double meta_c = fleming ? theta : m_ratio * theta;
+        
+        double adj_lower = lower_bound - theta + meta_c;
+        double adj_upper = upper_bound - theta + meta_c;
+        
+        double P1 = resp_A ? normcdf_cpp(theta - loc) : (1.0 - normcdf_cpp(theta - loc));
+        
+        double D2 = resp_A ? normcdf_cpp(meta_c - loc2) : (1.0 - normcdf_cpp(meta_c - loc2));
+        
+        double p_upper = normcdf_cpp(adj_upper - loc2);
+        double p_lower = normcdf_cpp(adj_lower - loc2);
+        double P2 = std::max(p_upper - p_lower, 0.0);
+        
+        return P1 * (P2 / std::max(D2, constants::MIN_P));
+    };
+    
+    return compute_regression_negLogL(p, dat, n_meta, calc_prob);
+}
+
+double ll_Mratio_regression(const vec& p, const RegressionData& dat) {
+    return ll_Mratio_regression_helper(p, dat, false);
+}
+
+double ll_MratioF_regression(const vec& p, const RegressionData& dat) {
+    return ll_Mratio_regression_helper(p, dat, true);
 }

@@ -2,9 +2,16 @@
 #include "likelihoods_func.h"
 #include "utils.h"
 
-// [[Rcpp::export]]
-double ll_SDT_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::mat& N_SA_RB,
-     const arma::mat& N_SB_RA,const arma::mat& N_SB_RB, int nRatings, int nCond) {
+using namespace arma;
+using namespace Rcpp;
+
+double ll_SDT_cpp(const arma::vec& p, const ModelData& dat) {
+    const arma::mat& N_SA_RA = dat.N_SA_RA;
+    const arma::mat& N_SA_RB = dat.N_SA_RB;
+    const arma::mat& N_SB_RA = dat.N_SB_RA;
+    const arma::mat& N_SB_RB = dat.N_SB_RB;
+    int nRatings = dat.nRatings;
+    int nCond = dat.nCond;
 
     const arma::vec ds = compute_sensitivity(p, nCond);
     const arma::vec locA = -ds / 2.0;
@@ -67,4 +74,21 @@ double ll_SDT_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::mat&
         }
     }
     return negLogL;
+}
+
+
+double ll_SDT_regression(const vec& p, const RegressionData& dat) {
+    int n_meta = 0;
+    
+    auto calc_prob = [](bool resp_A, double loc, double theta, 
+                        double lower_bound, double upper_bound, 
+                        double d, const std::vector<double>& m) {
+        
+        double p_upper = normcdf_cpp(upper_bound - loc);
+        double p_lower = normcdf_cpp(lower_bound - loc);
+        
+        return p_upper - p_lower;
+    };
+    
+    return compute_regression_negLogL(p, dat, n_meta, calc_prob);
 }

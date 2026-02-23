@@ -1,10 +1,16 @@
 #include "likelihoods_func.h"
 #include "utils.h"
 
+using namespace arma;
+using namespace Rcpp;
 
-// [[Rcpp::export]]
-double ll_SDTvarS_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::mat& N_SA_RB,
-        const arma::mat& N_SB_RA,const arma::mat& N_SB_RB, int nRatings, int nCond) {
+double ll_SDTvarS_cpp(const arma::vec& p, const ModelData& dat) {
+    const arma::mat& N_SA_RA = dat.N_SA_RA;
+    const arma::mat& N_SA_RB = dat.N_SA_RB;
+    const arma::mat& N_SB_RA = dat.N_SB_RA;
+    const arma::mat& N_SB_RB = dat.N_SB_RB;
+    int nRatings = dat.nRatings;
+    int nCond = dat.nCond;
 
     const arma::vec locA = -p.subvec(0, nCond - 1) / 2.0;
     const arma::vec locB =  p.subvec(0, nCond - 1) / 2.0;

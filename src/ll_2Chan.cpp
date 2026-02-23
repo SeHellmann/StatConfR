@@ -2,11 +2,18 @@
 #include "likelihoods_func.h"
 #include "utils.h"
 
+using namespace arma;
+using namespace Rcpp;
+
 // Independent Gaussian - 2 channel
 
-// [[Rcpp::export]]
-double ll_2Chan_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::mat& N_SA_RB, const arma::mat& N_SB_RA,
-        const arma::mat& N_SB_RB, int nRatings, int nCond) {
+double ll_2Chan_cpp(const arma::vec& p, const ModelData& dat) {
+    const arma::mat& N_SA_RA = dat.N_SA_RA;
+    const arma::mat& N_SA_RB = dat.N_SA_RB;
+    const arma::mat& N_SB_RA = dat.N_SB_RA;
+    const arma::mat& N_SB_RB = dat.N_SB_RB;
+    int nRatings = dat.nRatings;
+    int nCond = dat.nCond;
 
     const arma::vec ds = arma::exp(p.subvec(0, nCond - 1));
     const arma::vec locA1 = -ds / 2.0;
@@ -88,4 +95,31 @@ double ll_2Chan_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::ma
     }
 
     return negLogL;
+}
+
+
+double ll_2Chan_regression(const arma::vec& p, const RegressionData& dat) {
+    int n_meta = 1;
+    
+    auto calc_prob = [](bool resp_A, double loc, double theta, 
+                        double lower_bound, double upper_bound, 
+                        double d, const std::vector<double>& m) {
+        
+        // Reverse log-link for meta parameter
+        double m_ratio = std::exp(m[0]);
+        double loc2 = loc * m_ratio; 
+        
+        double adj_upper = (resp_A && upper_bound == theta) ? arma::datum::inf : upper_bound;
+        double adj_lower = (!resp_A && lower_bound == theta) ? -arma::datum::inf : lower_bound;
+        
+        double p_chan1 = resp_A ? normcdf_cpp(theta - loc) : (1.0 - normcdf_cpp(theta - loc));
+        
+        double p_chan2_upper = normcdf_cpp(adj_upper - loc2);
+        double p_chan2_lower = normcdf_cpp(adj_lower - loc2);
+        double p_chan2 = std::max(p_chan2_upper - p_chan2_lower, 0.0);
+        
+        return p_chan1 * p_chan2;
+    };
+    
+    return compute_regression_negLogL(p, dat, n_meta, calc_prob);
 }

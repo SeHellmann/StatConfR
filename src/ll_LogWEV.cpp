@@ -2,6 +2,8 @@
 #include "utils.h"
 #include <RcppNumerical.h>
 
+using namespace arma;
+using namespace Rcpp;
 using namespace Numer;
 
 // (plnorm(q = c_RB[i+1], (1 - w) * x + ds[j] * w, sigma) - plnorm(q = c_RB[i], (1 - w) * x + ds[j] * w,  sigma)
@@ -65,11 +67,15 @@ public:
     }
 };
 
-// [[Rcpp::export]]
-double ll_LogWEV_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::mat& N_SA_RB,
-                     const arma::mat& N_SB_RA, const arma::mat& N_SB_RB,
-                     int nRatings, int nCond) {
 
+double ll_LogWEV_cpp(const arma::vec& p, const ModelData& dat) {
+    const arma::mat& N_SA_RA = dat.N_SA_RA;
+    const arma::mat& N_SA_RB = dat.N_SA_RB;
+    const arma::mat& N_SB_RA = dat.N_SB_RA;
+    const arma::mat& N_SB_RB = dat.N_SB_RB;
+    int nRatings = dat.nRatings;
+    int nCond = dat.nCond;
+    
     const arma::vec ds = compute_sensitivity(p, nCond);
     const arma::vec locA = -ds / 2.0;
     const arma::vec locB =  ds / 2.0;
@@ -151,4 +157,46 @@ double ll_LogWEV_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::m
 
     return compute_negLogL(p_SA_RA, p_SA_RB, p_SB_RA, p_SB_RB,
                            N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB);
-} 
+}
+
+
+double ll_LogWEV_regression(const vec& p, const RegressionData& dat) {
+    int n_meta = 2;
+    
+    auto calc_prob = [](bool resp_A, double loc, double theta, 
+                        double lower_bound, double upper_bound, 
+                        double d, const std::vector<double>& m) {
+        
+        // Link functions: sigma is log-linked, w is qlogis-linked
+        double sigma = std::exp(m[0]);
+        double w = 1.0 / (1.0 + std::exp(-m[1]));
+        
+        double err_est; 
+        int err_code;
+        const double tol = 1e-8;
+        const int max_subdiv = 100;
+        
+        if (resp_A) {
+            double c_lo = upper_bound - theta;
+            double c_hi = lower_bound - theta;
+            
+            LogWEVIntegrand_RA f_ra;
+            f_ra.set_params(loc, c_lo, c_hi, w, d, sigma);
+            
+            // Integrate decision variable from -Inf to theta
+            return integrate(f_ra, -arma::datum::inf, theta, err_est, err_code, max_subdiv, tol, tol);
+            
+        } else {
+            double c_lo = lower_bound - theta;
+            double c_hi = upper_bound - theta;
+            
+            LogWEVIntegrand_RB f_rb;
+            f_rb.set_params(loc, c_lo, c_hi, w, d, sigma);
+            
+            // Integrate decision variable from theta to Inf
+            return integrate(f_rb, theta, arma::datum::inf, err_est, err_code, max_subdiv, tol, tol);
+        }
+    };
+    
+    return compute_regression_negLogL(p, dat, n_meta, calc_prob);
+}

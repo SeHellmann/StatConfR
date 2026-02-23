@@ -3,6 +3,8 @@
 #include "utils.h"
 #include <RcppNumerical.h>
 
+using namespace arma;
+using namespace Rcpp;
 using namespace Numer;
 
 //(plnorm((x-theta)/c_lo, meanlog, sdlog) - plnorm((x-theta)/c_hi, meanlog, sdlog))
@@ -71,10 +73,15 @@ public:
     }
 };
 
-// [[Rcpp::export]]
-double ll_CAS_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::mat& N_SA_RB, const arma::mat& N_SB_RA,
-        const arma::mat& N_SB_RB, int nRatings, int nCond){
 
+double ll_CAS_cpp(const arma::vec& p, const ModelData& dat) {
+    const arma::mat& N_SA_RA = dat.N_SA_RA;
+    const arma::mat& N_SA_RB = dat.N_SA_RB;
+    const arma::mat& N_SB_RA = dat.N_SB_RA;
+    const arma::mat& N_SB_RB = dat.N_SB_RB;
+    int nRatings = dat.nRatings;
+    int nCond = dat.nCond;
+    
     const arma::vec ds = compute_sensitivity(p, nCond);
     const arma::vec locA = -ds / 2.0;
     const arma::vec locB =  ds / 2.0;
@@ -189,4 +196,41 @@ double ll_CAS_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::mat&
                            N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB);
 
 
+}
+
+
+double ll_CAS_regression(const vec& p, const RegressionData& dat) {
+    int n_meta = 1;
+    
+    auto calc_prob = [](bool resp_A, double loc, double theta, 
+                        double lower_bound, double upper_bound, 
+                        double d, const std::vector<double>& m) {
+        
+        double sigma = std::exp(m[0]);
+        double sigma_sq = sigma * sigma;
+        double meanlog = std::log(1.0 / std::sqrt(1.0 + sigma_sq));
+        double sdlog = std::sqrt(std::log(1.0 + sigma_sq));
+        
+
+        double raw_lower = lower_bound - theta;
+        double raw_upper = upper_bound - theta;
+        
+        double err_est; 
+        int err_code;
+        const double tol = 1e-8;
+        const int max_subdiv = 100;
+        
+        if (resp_A) {
+            CASIntegrand_RA f_ra;
+            f_ra.set_params(loc, raw_lower, raw_upper, theta, meanlog, sdlog);
+            return integrate(f_ra, -arma::datum::inf, theta, err_est, err_code, max_subdiv, tol, tol);
+            
+        } else {
+            CASIntegrand_RB f_rb;
+            f_rb.set_params(loc, raw_lower, raw_upper, theta, meanlog, sdlog);
+            return integrate(f_rb, theta, arma::datum::inf, err_est, err_code, max_subdiv, tol, tol);
+        }
+    };
+    
+    return compute_regression_negLogL(p, dat, n_meta, calc_prob);
 }
