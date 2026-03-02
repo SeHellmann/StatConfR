@@ -88,53 +88,22 @@ double ll_CAS_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::mat&
     // R: c_RA <- c(-Inf, -rev(cumsum(c(exp(p[(nCond+1):(nCond+nRatings-1)])))), 0)
     // R: c_RB <- c(0, cumsum(c(exp(p[(nCond+nRatings+1):(nCond + nRatings*2-1)]))), Inf)
 
-    // R indexing
-    int ra_start_r = nCond + 1;
-    int ra_end_r = nCond + nRatings - 1;
-    int rb_start_r = nCond + nRatings + 1;
-    int rb_end_r = nCond + nRatings * 2 - 1;
-
-    // allow reversed sequence |end - start| + 1 elements
-    int n_ra = std::abs(ra_end_r - ra_start_r) + 1;
-    int n_rb = std::abs(rb_end_r - rb_start_r) + 1;
-
-    arma::vec c_RA(n_ra + 2);
-    arma::vec c_RB(n_rb + 2);
+    arma::vec c_RA(nRatings + 1);
+    arma::vec c_RB(nRatings + 1);
 
     c_RA(0) = -arma::datum::inf;
-    c_RA(n_ra + 1) = 0;
+    c_RA(nRatings) = 0;
 
     c_RB(0) = 0;
-    c_RB(n_rb + 1) = arma::datum::inf;
+    c_RB(nRatings) = arma::datum::inf;
 
-    arma::vec p_ra(n_ra);
-    arma::vec p_rb(n_rb);
+    if (nRatings > 1) {
+        const arma::vec p_ra = p.subvec(nCond, nCond + nRatings - 2);
+        c_RA.subvec(1, nRatings - 1) = -arma::reverse(arma::cumsum(arma::exp(p_ra)));
 
-    if (ra_start_r <= ra_end_r) {
-        p_ra = p.subvec(ra_start_r - 1, ra_end_r - 1);
-    } else {
-        // Reversed case: R returns elements in reverse order
-        for (int k = 0; k < n_ra; ++k) {
-            p_ra(k) = p(ra_start_r - 1 - k);
-        }
+        const arma::vec p_rb = p.subvec(nCond + nRatings, nCond + nRatings * 2 - 2);
+        c_RB.subvec(1, nRatings - 1) = arma::cumsum(arma::exp(p_rb));
     }
-
-    if (rb_start_r <= rb_end_r) {
-        p_rb = p.subvec(rb_start_r - 1, rb_end_r - 1);
-    } else {
-        // Reversed case: R returns elements in reverse order
-        for (int k = 0; k < n_rb; ++k) {
-            p_rb(k) = p(rb_start_r - 1 - k);
-        }
-    }
-
-    // c_RA: -rev(cumsum(exp(p_ra)))
-    arma::vec cumsum_ra = arma::cumsum(arma::exp(p_ra));
-    c_RA.subvec(1, n_ra) = -arma::reverse(cumsum_ra);
-
-    // c_RB: cumsum(exp(p_rb))
-    arma::vec cumsum_rb = arma::cumsum(arma::exp(p_rb));
-    c_RB.subvec(1, n_rb) = cumsum_rb;
 
     // Probability matrices
     arma::mat p_SA_RA(nCond, nRatings);

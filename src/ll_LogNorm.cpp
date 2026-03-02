@@ -75,11 +75,13 @@ double ll_LogNorm_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::
     // sigma needs to be bounded between 0 and Inf
     // see whether the results converge.
     const double sigma = std::exp(p(nCond + nRatings * 2 - 1));
-        
+    
+    arma::vec mu_cA, mu_cB;
     //average placement of the confidence criteria
-    const arma::vec mu_cA = theta + arma::reverse(arma::cumsum(arma::exp(p.subvec(nCond, nCond + nRatings - 2))));
-    const arma::vec mu_cB = theta + arma::cumsum(arma::exp(p.subvec(nCond + nRatings, nCond + nRatings * 2 - 2)));
-
+    if (nRatings > 1) {
+    mu_cA = theta + arma::reverse(arma::cumsum(arma::exp(p.subvec(nCond, nCond + nRatings - 2))));
+    mu_cB = theta + arma::cumsum(arma::exp(p.subvec(nCond + nRatings, nCond + nRatings * 2 - 2)));
+    }
     // convert to the location parameter of the latent lognormal distribution
     arma::vec loc_RA(nRatings + 1);
     arma::vec loc_RB(nRatings + 1);
