@@ -14,6 +14,7 @@ namespace constants {
     constexpr double MIN_P = 1e-64;
     constexpr double INV_SQRT_2PI = 0.3989422804014327; // 1/sqrt(2*pi)
     constexpr double LOG_MIN_P = -147.4131591025766;    // log(1e-64)
+    constexpr double M1_SQRTPI = 0.5641895835477563; // 1/sqrt(pi)
 }
 
 arma::vec compute_sensitivity(const arma::vec& p, int nCond);

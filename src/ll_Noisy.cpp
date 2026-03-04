@@ -1,6 +1,8 @@
 #include "likelihoods_func.h"
 #include "utils.h"
+#include "gauss_hermite.h"
 #include <RcppNumerical.h>
+
 
 using namespace Numer;
 
@@ -26,6 +28,26 @@ public:
         return dnorm_val * (pnorm_hi - pnorm_lo);
     }
 };
+
+  // Inline helper — replaces the entire NoisyIntegrand class
+  // Integrates φ(x; loc, 1) · [Φ(c_hi; x, σ) - Φ(c_lo; x, σ)]
+  // over the half-line defined by the decision boundary theta.
+  // response_B = true  →  integrates [theta, +∞)
+  // response_B = false →  integrates (-∞, theta]
+  inline double gh_noisy(double loc, double c_lo, double c_hi,
+                          double sigma, double theta, bool response_B) {
+      double sum = 0.0;
+      for (int k = 0; k < GH_ORDER; k++) {
+          double x = loc + M_SQRT2 * GH_NODES[k];       // shift node to correct location
+          bool include = response_B ? (x > theta) : (x <= theta);
+          if (include) {
+              sum += GH_WEIGHTS[k] * (pnorm_cpp(c_hi, x, sigma)
+                              - pnorm_cpp(c_lo, x, sigma));
+          }
+      }
+      return sum * constants::M1_SQRTPI; // scale by 1/sqrt(2π)
+  }
+
 
 // [[Rcpp::export]]
 double ll_Noisy_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::mat& N_SA_RB, const arma::mat& N_SB_RA,
@@ -74,6 +96,7 @@ double ll_Noisy_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::ma
     const double tol = 1e-8;
     const int max_subdiv = 100;
 
+    /*
     NoisyIntegrand f;
 
         // Compute all integrals
@@ -107,6 +130,16 @@ double ll_Noisy_cpp(const arma::vec& p, const arma::mat& N_SA_RA, const arma::ma
             } else {
                 p_SA_RB(j, i) = constants::MIN_P; // wont affect ll
             }
+        }
+    }
+        */
+    // Compute all integrals using Gauss-Hermite quadrature
+    for (int j = 0; j < nCond; j++) {
+        for (int i = 0; i < nRatings; i++) {
+            p_SB_RB(j,i) = gh_noisy(locB(j), c_RB(i), c_RB(i+1), sigma, theta, true);
+            p_SB_RA(j,i) = gh_noisy(locB(j), c_RA(i), c_RA(i+1), sigma, theta, false);
+            p_SA_RA(j,i) = gh_noisy(locA(j), c_RA(i), c_RA(i+1), sigma, theta, false);
+            p_SA_RB(j,i) = gh_noisy(locA(j), c_RB(i), c_RB(i+1), sigma, theta, true);
         }
     }
     return compute_negLogL(p_SA_RA, p_SA_RB, p_SB_RA, p_SB_RB,
