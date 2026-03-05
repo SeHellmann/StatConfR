@@ -3,6 +3,9 @@
 #include "utils.h"
 
 // Integrates φ(x; loc, 1) · [Φ(c_hi; x, σ) - Φ(c_lo; x, σ)]
+// Bounds depend on response type:
+// Response B: [theta, ∞)
+// Response A: (-∞, theta]
 inline double gl_noisy(double loc, double c_lo, double c_hi, double sigma,
                        double theta, bool response_B) {
   // beyond SD = 7 contribution from integration negligible
@@ -13,9 +16,9 @@ inline double gl_noisy(double loc, double c_lo, double c_hi, double sigma,
   double sum = 0.0;
   for (int k = 0; k < GL_ORDER; k++) {
     double x = mid + half * GL_NODES[k];
-    double phi_x =
+    double dnorm_val =
         std::exp(-0.5 * (x - loc) * (x - loc)) * constants::INV_SQRT_2PI;
-    sum += GL_WEIGHTS[k] * phi_x *
+    sum += GL_WEIGHTS[k] * dnorm_val *
            (pnorm_cpp(c_hi, x, sigma) - pnorm_cpp(c_lo, x, sigma));
   }
   return sum * half;
@@ -70,14 +73,14 @@ double ll_Noisy_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
 
   for (int j = 0; j < nCond; j++) {
     for (int i = 0; i < nRatings; i++) {
-      p_SB_RB(j, i) =
-          gl_noisy(locB(j), c_RB(i), c_RB(i + 1), sigma, theta, true);
-      p_SB_RA(j, i) =
-          gl_noisy(locB(j), c_RA(i), c_RA(i + 1), sigma, theta, false);
-      p_SA_RA(j, i) =
-          gl_noisy(locA(j), c_RA(i), c_RA(i + 1), sigma, theta, false);
-      p_SA_RB(j, i) =
-          gl_noisy(locA(j), c_RB(i), c_RB(i + 1), sigma, theta, true);
+      p_SB_RB(j, i) =  (N_SB_RB(j, i) > 0) ? 
+          gl_noisy(locB(j), c_RB(i), c_RB(i + 1), sigma, theta, true) : constants::MIN_P;
+      p_SB_RA(j, i) = (N_SB_RA(j, i) > 0) ?
+          gl_noisy(locB(j), c_RA(i), c_RA(i + 1), sigma, theta, false) : constants::MIN_P;
+      p_SA_RA(j, i) = (N_SA_RA(j, i) > 0) ?
+          gl_noisy(locA(j), c_RA(i), c_RA(i + 1), sigma, theta, false) : constants::MIN_P;
+      p_SA_RB(j, i) = (N_SA_RB(j, i) > 0) ?
+          gl_noisy(locA(j), c_RB(i), c_RB(i + 1), sigma, theta, true) : constants::MIN_P;
     }
   }
   return compute_negLogL(p_SA_RA, p_SA_RB, p_SB_RA, p_SB_RB, N_SA_RA, N_SA_RB,
