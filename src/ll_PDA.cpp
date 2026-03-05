@@ -2,25 +2,6 @@
 #include "likelihoods_func.h"
 #include "utils.h"
 
-inline double gl_pda(double loc, double c_lo, double c_hi, double sigma,
-                     double a, double theta, bool response_B) {
-  // beyond SD = 7 contribution from integration negligible
-  double a_lim = response_B ? theta : loc - 7.0;
-  double b_lim = response_B ? loc + 7.0 : theta;
-  double mid = (a_lim + b_lim) / 2.0;
-  double half = (b_lim - a_lim) / 2.0;
-  double sum = 0.0;
-  for (int k = 0; k < GL_ORDER; k++) {
-    double x = mid + half * GL_NODES[k];
-    double dnorm_val =
-        std::exp(-0.5 * (x - loc) * (x - loc)) * constants::INV_SQRT_2PI;
-    sum += GL_WEIGHTS[k] * dnorm_val *
-           (pnorm_cpp(c_hi, x + loc * a, sigma) -
-            pnorm_cpp(c_lo, x + loc * a, sigma));
-  }
-  return sum * half;
-}
-
 // [[Rcpp::export]]
 double ll_PDA_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
                   const arma::mat &N_SA_RB, const arma::mat &N_SB_RA,
@@ -73,19 +54,39 @@ double ll_PDA_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
     for (int i = 0; i < nRatings; i++) {
       p_SB_RB(j, i) =
           (N_SB_RB(j, i) > 0)
-              ? gl_pda(locB(j), c_RB(i), c_RB(i + 1), sigma, a, theta, true)
+              ? gl_integrate(
+                    locB(j), theta, true,
+                    [&](double x) {
+                      return pnorm_cpp(c_RB(i + 1), x + locB(j) * a, sigma) -
+                             pnorm_cpp(c_RB(i), x + locB(j) * a, sigma);
+                    })
               : constants::MIN_P;
       p_SB_RA(j, i) =
           (N_SB_RA(j, i) > 0)
-              ? gl_pda(locB(j), c_RA(i), c_RA(i + 1), sigma, a, theta, false)
+              ? gl_integrate(
+                    locB(j), theta, false,
+                    [&](double x) {
+                      return pnorm_cpp(c_RA(i + 1), x + locB(j) * a, sigma) -
+                             pnorm_cpp(c_RA(i), x + locB(j) * a, sigma);
+                    })
               : constants::MIN_P;
       p_SA_RA(j, i) =
           (N_SA_RA(j, i) > 0)
-              ? gl_pda(locA(j), c_RA(i), c_RA(i + 1), sigma, a, theta, false)
+              ? gl_integrate(
+                    locA(j), theta, false,
+                    [&](double x) {
+                      return pnorm_cpp(c_RA(i + 1), x + locA(j) * a, sigma) -
+                             pnorm_cpp(c_RA(i), x + locA(j) * a, sigma);
+                    })
               : constants::MIN_P;
       p_SA_RB(j, i) =
           (N_SA_RB(j, i) > 0)
-              ? gl_pda(locA(j), c_RB(i), c_RB(i + 1), sigma, a, theta, true)
+              ? gl_integrate(
+                    locA(j), theta, true,
+                    [&](double x) {
+                      return pnorm_cpp(c_RB(i + 1), x + locA(j) * a, sigma) -
+                             pnorm_cpp(c_RB(i), x + locA(j) * a, sigma);
+                    })
               : constants::MIN_P;
     }
   }

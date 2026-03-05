@@ -2,27 +2,6 @@
 #include "likelihoods_func.h"
 #include "utils.h"
 
-inline double gl_cev(double loc, double c_lo, double c_hi, double w,
-                     double ds_j, double sigma, double theta, bool response_B) {
-  // beyond SD = 7 contribution from integration negligible
-  double a_lim = response_B ? theta : loc - 7.0;
-  double b_lim = response_B ? loc + 7.0 : theta;
-  double mid = (a_lim + b_lim) / 2.0;
-  double half = (b_lim - a_lim) / 2.0;
-  double sum = 0.0;
-  for (int k = 0; k < GL_ORDER; k++) {
-    double x = mid + half * GL_NODES[k];
-    double dnorm_val =
-        std::exp(-0.5 * (x - loc) * (x - loc)) * constants::INV_SQRT_2PI;
-    double mean_val =
-        response_B ? (1.0 - w) * x + ds_j * w : (1.0 - w) * x - ds_j * w;
-    sum +=
-        GL_WEIGHTS[k] * dnorm_val *
-        (pnorm_cpp(c_hi, mean_val, sigma) - pnorm_cpp(c_lo, mean_val, sigma));
-  }
-  return sum * half;
-}
-
 // [[Rcpp::export]]
 double ll_CEV_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
                   const arma::mat &N_SA_RB, const arma::mat &N_SB_RA,
@@ -75,23 +54,45 @@ double ll_CEV_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
   arma::mat p_SB_RB(nCond, nRatings);
 
   for (int j = 0; j < nCond; j++) {
+    double ds_j = ds(j);
+    double mean_val;
     for (int i = 0; i < nRatings; i++) {
-      p_SB_RB(j, i) = (N_SB_RB(j, i) > 0)
-                          ? gl_cev(locB(j), c_RB(i), c_RB(i + 1), w, ds(j),
-                                   sigma, theta, true)
-                          : constants::MIN_P;
-      p_SB_RA(j, i) = (N_SB_RA(j, i) > 0)
-                          ? gl_cev(locB(j), c_RA(i), c_RA(i + 1), w, ds(j),
-                                   sigma, theta, false)
-                          : constants::MIN_P;
-      p_SA_RA(j, i) = (N_SA_RA(j, i) > 0)
-                          ? gl_cev(locA(j), c_RA(i), c_RA(i + 1), w, ds(j),
-                                   sigma, theta, false)
-                          : constants::MIN_P;
-      p_SA_RB(j, i) = (N_SA_RB(j, i) > 0)
-                          ? gl_cev(locA(j), c_RB(i), c_RB(i + 1), w, ds(j),
-                                   sigma, theta, true)
-                          : constants::MIN_P;
+      p_SB_RB(j, i) =
+          (N_SB_RB(j, i) > 0)
+              ? gl_integrate(locB(j), theta, true,
+                             [&](double x) {
+                               mean_val = (1.0 - w) * x + w * ds_j;
+                               return pnorm_cpp(c_RB(i + 1), mean_val, sigma) -
+                                      pnorm_cpp(c_RB(i), mean_val, sigma);
+                             })
+              : constants::MIN_P;
+      p_SB_RA(j, i) =
+          (N_SB_RA(j, i) > 0)
+              ? gl_integrate(locB(j), theta, false,
+                             [&](double x) {
+                               mean_val = (1.0 - w) * x - w * ds_j;
+                               return pnorm_cpp(c_RA(i + 1), mean_val, sigma) -
+                                      pnorm_cpp(c_RA(i), mean_val, sigma);
+                             })
+              : constants::MIN_P;
+      p_SA_RA(j, i) =
+          (N_SA_RA(j, i) > 0)
+              ? gl_integrate(locA(j), theta, false,
+                             [&](double x) {
+                               mean_val = (1.0 - w) * x - w * ds_j;
+                               return pnorm_cpp(c_RA(i + 1), mean_val, sigma) -
+                                      pnorm_cpp(c_RA(i), mean_val, sigma);
+                             })
+              : constants::MIN_P;
+      p_SA_RB(j, i) =
+          (N_SA_RB(j, i) > 0)
+              ? gl_integrate(locA(j), theta, true,
+                             [&](double x) {
+                               mean_val = (1.0 - w) * x + w * ds_j;
+                               return pnorm_cpp(c_RB(i + 1), mean_val, sigma) -
+                                      pnorm_cpp(c_RB(i), mean_val, sigma);
+                             })
+              : constants::MIN_P;
     }
   }
   return compute_negLogL(p_SA_RA, p_SA_RB, p_SB_RA, p_SB_RB, N_SA_RA, N_SA_RB,
