@@ -7,7 +7,7 @@
 
 constexpr int GL_ORDER = 40;
 
-constexpr double GL_NODES[40] = {
+constexpr const double GL_NODES[40] = {
     -9.982377097105588e-01, -9.907262386994566e-01, -9.772599499837744e-01,
     -9.579168192137910e-01, -9.328128082786764e-01, -9.020988069688740e-01,
     -8.659595032122591e-01, -8.246122308333108e-01, -7.783056514265185e-01,
@@ -23,7 +23,7 @@ constexpr double GL_NODES[40] = {
     9.579168192137916e-01,  9.772599499837743e-01,  9.907262386994570e-01,
     9.982377097105593e-01};
 
-constexpr double GL_WEIGHTS[40] = {
+constexpr const double GL_WEIGHTS[40] = {
     4.521277098532152e-03, 1.049828453115456e-02, 1.642105838190558e-02,
     2.224584919416756e-02, 2.793700698002332e-02, 3.346019528254786e-02,
     3.878216797447201e-02, 4.387090818567489e-02, 4.869580763507159e-02,
@@ -40,12 +40,10 @@ constexpr double GL_WEIGHTS[40] = {
     4.521277098533161e-03};
 
 template <typename F>
-inline double gl_integrate(double loc, double theta, bool response_B,
-                           F &&integrand) {
-  double a = response_B ? theta : loc - 7.0;
-  double b = response_B ? loc + 7.0 : theta;
-  double mid = (a + b) * 0.5;
-  double half = (b - a) * 0.5;
+inline double gl_integrate(double lo, double hi, double loc, F &&integrand) {
+  if (hi <= lo) return 0.0;
+  double mid = (lo + hi) * 0.5;
+  double half = (hi - lo) * 0.5;
   double sum = 0.0;
   for (int k = 0; k < GL_ORDER; k++) {
     double x = mid + half * GL_NODES[k];

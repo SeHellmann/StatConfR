@@ -19,10 +19,6 @@ double ll_CAS_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
   const double meanlog = std::log(1.0 / std::sqrt(1 + sigma_sq));
   const double sdlog = std::sqrt(std::log(1 + sigma_sq));
 
-  // R: c_RA <- c(-Inf, -rev(cumsum(c(exp(p[(nCond+1):(nCond+nRatings-1)])))),
-  // 0) R: c_RB <- c(0, cumsum(c(exp(p[(nCond+nRatings+1):(nCond +
-  // nRatings*2-1)]))), Inf)
-
   arma::vec c_RA(nRatings + 1);
   arma::vec c_RB(nRatings + 1);
 
@@ -47,47 +43,42 @@ double ll_CAS_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
   arma::mat p_SB_RA(nCond, nRatings);
   arma::mat p_SB_RB(nCond, nRatings);
 
+  const double trunc = 7.0;
+
   for (int j = 0; j < nCond; j++) {
+    const double lB = locB(j), lA = locA(j);
     for (int i = 0; i < nRatings; i++) {
+      const double cRB_lo = c_RB(i), cRB_hi = c_RB(i + 1);
+      const double cRA_lo = c_RA(i), cRA_hi = c_RA(i + 1);
+
+      // RB (x > theta): plnorm((x-θ)/c, meanlog, sdlog) where c > 0                                                                                                                             
+      // RA (x < theta): plnorm(|x-θ|/|c|, meanlog, sdlog) where c < 0 
+
+      auto rb = [&](double x) {
+        return plnorm_cpp((x - theta) / cRB_lo, meanlog, sdlog) -
+               plnorm_cpp((x - theta) / cRB_hi, meanlog, sdlog);
+      };
+
+      auto ra = [&](double x) {
+        return plnorm_cpp(std::abs((x - theta) / cRA_hi), meanlog, sdlog) -
+               plnorm_cpp((x - theta) / cRA_lo, meanlog, sdlog);
+      };
+
       p_SB_RB(j, i) =
           (N_SB_RB(j, i) > 0)
-              ? gl_integrate(locB(j), theta, true,
-                             [&](double x) {
-                               return plnorm_cpp((x - theta) / c_RB(i), meanlog,
-                                                 sdlog) -
-                                      plnorm_cpp((x - theta) / c_RB(i + 1),
-                                                 meanlog, sdlog);
-                             })
+              ? gl_integrate(theta, lB + trunc, lB, rb)      
               : constants::MIN_P;
       p_SB_RA(j, i) =
           (N_SB_RA(j, i) > 0)
-              ? gl_integrate(
-                    locB(j), theta, false,
-                    [&](double x) {
-                      return plnorm_cpp(std::abs((x - theta) / c_RA(i + 1)),
-                                        meanlog, sdlog) -
-                             plnorm_cpp((x - theta) / c_RA(i), meanlog, sdlog);
-                    })
+              ? gl_integrate(lB - trunc, theta, lB, ra)
               : constants::MIN_P;
       p_SA_RA(j, i) =
           (N_SA_RA(j, i) > 0)
-              ? gl_integrate(
-                    locA(j), theta, false,
-                    [&](double x) {
-                      return plnorm_cpp(std::abs((x - theta) / c_RA(i + 1)),
-                                        meanlog, sdlog) -
-                             plnorm_cpp((x - theta) / c_RA(i), meanlog, sdlog);
-                    })
+              ? gl_integrate(lA - trunc, theta, lA, ra)
               : constants::MIN_P;
       p_SA_RB(j, i) =
           (N_SA_RB(j, i) > 0)
-              ? gl_integrate(locA(j), theta, true,
-                             [&](double x) {
-                               return plnorm_cpp((x - theta) / c_RB(i), meanlog,
-                                                 sdlog) -
-                                      plnorm_cpp((x - theta) / c_RB(i + 1),
-                                                 meanlog, sdlog);
-                             })
+              ? gl_integrate(theta, lA + trunc, lA, rb)
               : constants::MIN_P;
     }
   }

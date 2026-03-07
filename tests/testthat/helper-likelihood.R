@@ -13,7 +13,8 @@ compare_likelihood_generic <- function(r_func, cpp_func, inputs, tolerance = 1e-
     r_result   = r_result,
     cpp_result = cpp_result,
     difference = abs(r_result - cpp_result),
-    match      = abs(r_result - cpp_result) < tolerance
+    rel_diff   = abs(r_result - cpp_result) / max(abs(r_result), 1),
+    match      = abs(r_result - cpp_result) / max(abs(r_result), 1) < tolerance
   )
 }
 

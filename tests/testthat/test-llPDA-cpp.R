@@ -64,14 +64,13 @@ test_that("ll_PDA_cpp matches R across configurations", {
     list(nCond = 1, nRatings = 4, seed = 456),
     list(nCond = 2, nRatings = 2, seed = 789),
     list(nCond = 2, nRatings = 3, seed = 321),
-    list(nCond = 5, nRatings = 6, seed = 101, tol = 1e-3),
+    list(nCond = 5, nRatings = 6, seed = 101),
     list(nCond = 3, nRatings = 4, seed = 42)
   )
   for (cfg in configs) {
     if (cfg$nRatings == 2) next  # R indexing bug skip nRatings=2 for comparison
     inputs <- generate_pda_inputs(cfg$nCond, cfg$nRatings, cfg$seed)
-    tol <- if (!is.null(cfg$tol)) cfg$tol else 1e-4
-    result <- compare_likelihood_generic(ll_PDA, ll_PDA_cpp, inputs, tolerance = tol)
+    result <- compare_likelihood_generic(ll_PDA, ll_PDA_cpp, inputs, tolerance = 1e-4)
     expect_true(result$match,
       info = sprintf("nCond=%d nRatings=%d seed=%d: R=%f C++=%f diff=%e",
                      cfg$nCond, cfg$nRatings, cfg$seed,
@@ -107,7 +106,7 @@ test_that("ll_PDA_cpp matches R across parameter grid", {
       if (nRatings == 2) next  # R indexing bug skip nRatings=2 for comparison
       for (seed in c(111, 222, 333)) {
         inputs <- generate_pda_inputs(nCond, nRatings, seed)
-        result <- compare_likelihood_generic(ll_PDA, ll_PDA_cpp, inputs, tolerance = 1e-3)
+        result <- compare_likelihood_generic(ll_PDA, ll_PDA_cpp, inputs, tolerance = 1e-4)
         expect_true(result$match,
           info = sprintf("nCond=%d, nRatings=%d, seed=%d: diff=%e",
                          nCond, nRatings, seed, result$difference))

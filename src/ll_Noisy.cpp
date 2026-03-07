@@ -6,16 +6,10 @@
 double ll_Noisy_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
                     const arma::mat &N_SA_RB, const arma::mat &N_SB_RA,
                     const arma::mat &N_SB_RB, int nRatings, int nCond) {
-
   const arma::vec ds = compute_sensitivity(p, nCond);
   const arma::vec locA = -ds / 2.0;
   const arma::vec locB = ds / 2.0;
   const double theta = p(nCond + nRatings - 1);
-
-  // R: c_RA <- c(-Inf, p[nCond+nRatings-1] -
-  // rev(cumsum(exp(p[(nCond+1):(nCond+nRatings-2)]))), p[nCond+nRatings-1],
-  // Inf) R: c_RB <- c(-Inf, p[nCond+nRatings+1], p[nCond+nRatings+1] +
-  // cumsum(exp(p[(nCond+nRatings+2):(nCond+nRatings*2-1)])), Inf)
 
   const double anchor_ra = p(nCond + nRatings - 2);
   const double anchor_rb = p(nCond + nRatings);
@@ -49,39 +43,45 @@ double ll_Noisy_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
   arma::mat p_SB_RA(nCond, nRatings);
   arma::mat p_SB_RB(nCond, nRatings);
 
+  // trunc = 7: dnorm(x; loc, 1) is negligible outside loc +/- 7
+  // K = 7*sigma: pnorm(c; x, sigma) transitions within c +/- K in x-space
+  const double trunc = 7.0;
+  const double K = trunc * sigma;
+
   for (int j = 0; j < nCond; j++) {
+    const double lB = locB(j), lA = locA(j);
     for (int i = 0; i < nRatings; i++) {
+
+      const double cRB_lo = c_RB(i), cRB_hi = c_RB(i + 1);
+      const double cRA_lo = c_RA(i), cRA_hi = c_RA(i + 1);
+
+      const double rb_lo = std::max(theta, cRB_lo - K);  // RB lower (theta split)
+      const double ra_hi = std::min(theta, cRA_hi + K);  // RA upper (theta split)
+      const double rb_hi = cRB_hi + K;  // RB upper criterion side
+      const double ra_lo = cRA_lo - K;      // RA lower criterion side
+
+      auto rb = [&](double x) {
+        return pnorm_cpp(cRB_hi, x, sigma) - pnorm_cpp(cRB_lo, x, sigma);
+      };
+      auto ra = [&](double x) {
+        return pnorm_cpp(cRA_hi, x, sigma) - pnorm_cpp(cRA_lo, x, sigma);
+      };
+
       p_SB_RB(j, i) =
-          (N_SB_RB(j, i) > 0)
-              ? gl_integrate(locB(j), theta, true,
-                             [&](double x) {
-                               return pnorm_cpp(c_RB(i + 1), x, sigma) -
-                                      pnorm_cpp(c_RB(i), x, sigma);
-                             })
-              : constants::MIN_P;
-      p_SB_RA(j, i) =
-          (N_SB_RA(j, i) > 0)
-              ? gl_integrate(locB(j), theta, false,
-                             [&](double x) {
-                               return pnorm_cpp(c_RA(i + 1), x, sigma) -
-                                      pnorm_cpp(c_RA(i), x, sigma);
-                             })
-              : constants::MIN_P;
-      p_SA_RA(j, i) =
-          (N_SA_RA(j, i) > 0)
-              ? gl_integrate(locA(j), theta, false,
-                             [&](double x) {
-                               return pnorm_cpp(c_RA(i + 1), x, sigma) -
-                                      pnorm_cpp(c_RA(i), x, sigma);
-                             })
+          N_SB_RB(j, i) > 0
+              ? gl_integrate(rb_lo, std::min(lB + trunc, rb_hi), lB, rb)
               : constants::MIN_P;
       p_SA_RB(j, i) =
-          (N_SA_RB(j, i) > 0)
-              ? gl_integrate(locA(j), theta, true,
-                             [&](double x) {
-                               return pnorm_cpp(c_RB(i + 1), x, sigma) -
-                                      pnorm_cpp(c_RB(i), x, sigma);
-                             })
+          N_SA_RB(j, i) > 0
+              ? gl_integrate(rb_lo, std::min(lA + trunc, rb_hi), lA, rb)
+              : constants::MIN_P;
+      p_SB_RA(j, i) =
+          N_SB_RA(j, i) > 0
+              ? gl_integrate(std::max(lB - trunc, ra_lo), ra_hi, lB, ra)
+              : constants::MIN_P;
+      p_SA_RA(j, i) =
+          N_SA_RA(j, i) > 0
+              ? gl_integrate(std::max(lA - trunc, ra_lo), ra_hi, lA, ra)
               : constants::MIN_P;
     }
   }

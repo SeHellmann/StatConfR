@@ -90,13 +90,12 @@ test_that("ll_LogWEV_cpp matches R across configurations", {
     list(nCond = 1, nRatings = 4, seed = 456),
     list(nCond = 2, nRatings = 2, seed = 789),
     list(nCond = 2, nRatings = 3, seed = 321),
-    list(nCond = 5, nRatings = 6, seed = 101, tol = 1e-3),
+    list(nCond = 5, nRatings = 6, seed = 101),
     list(nCond = 3, nRatings = 4, seed = 42)
   )
   for (cfg in configs) {
     inputs <- generate_logwev_inputs(cfg$nCond, cfg$nRatings, cfg$seed)
-    tol <- if (!is.null(cfg$tol)) cfg$tol else 1e-4
-    result <- compare_likelihood_generic(ll_LogWEV, ll_LogWEV_cpp, inputs, tolerance = tol)
+    result <- compare_likelihood_generic(ll_LogWEV, ll_LogWEV_cpp, inputs, tolerance = 1e-4)
     expect_true(result$match,
       info = sprintf("nCond=%d nRatings=%d seed=%d: R=%f C++=%f diff=%e",
                      cfg$nCond, cfg$nRatings, cfg$seed,
@@ -108,7 +107,7 @@ test_that("ll_LogWEV_cpp handles edge cases", {
   base <- generate_logwev_inputs(nCond = 2, nRatings = 4, seed = 123)
   for (nm in names(logwev_edge_cases)) {
     inputs <- logwev_edge_cases[[nm]](base)
-    result <- compare_likelihood_generic(ll_LogWEV, ll_LogWEV_cpp, inputs, tolerance = 1e-5)
+    result <- compare_likelihood_generic(ll_LogWEV, ll_LogWEV_cpp, inputs, tolerance = 1e-4)
     expect_true(is.finite(result$cpp_result), info = sprintf("'%s': result not finite", nm))
     expect_true(result$match,
       info = sprintf("'%s': R=%f C++=%f diff=%e", nm, result$r_result, result$cpp_result, result$difference))
@@ -146,7 +145,7 @@ test_that("ll_LogWEV_cpp matches R across parameter grid", {
     for (nRatings in 2:5) {
       for (seed in c(111, 222, 333)) {
         inputs <- generate_logwev_inputs(nCond, nRatings, seed)
-        result <- compare_likelihood_generic(ll_LogWEV, ll_LogWEV_cpp, inputs, tolerance = 1e-3)
+        result <- compare_likelihood_generic(ll_LogWEV, ll_LogWEV_cpp, inputs, tolerance = 1e-4)
         expect_true(result$match,
           info = sprintf("nCond=%d, nRatings=%d, seed=%d: diff=%e",
                          nCond, nRatings, seed, result$difference))

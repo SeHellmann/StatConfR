@@ -32,9 +32,7 @@ double ll_LogWEV_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
 
   const double sigma = std::exp(p(nCond + nRatings * 2 - 1));
   const double w_raw = p(nCond + nRatings * 2);
-  // const double w = std::exp(w_raw) / (1.0 + std::exp(w_raw));  // log
-  // transform to (0,1)
-  const double w = 1.0 / (1.0 + std::exp(-w_raw)); // avoid overflow
+  const double w = 1.0 / (1.0 + std::exp(-w_raw));
 
   // Probability matrices
   arma::mat p_SA_RA(nCond, nRatings);
@@ -42,59 +40,54 @@ double ll_LogWEV_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
   arma::mat p_SB_RA(nCond, nRatings);
   arma::mat p_SB_RB(nCond, nRatings);
 
-  // Compute all integrals
+  const double trunc = 7.0;
+
   for (int j = 0; j < nCond; ++j) {
-    double ds_j = ds(j);
+    const double ds_j = ds(j);
+    const double lB = locB(j), lA = locA(j);
     for (int i = 0; i < nRatings; ++i) {
       double meanlog;
-      int i_rev = nRatings - 1 - i;
+      const int i_rev = nRatings - 1 - i;
+      const double cRA_lo = c_RA(i), cRA_hi = c_RA(i + 1);
+      const double cRB_lo = c_RB(i), cRB_hi = c_RB(i + 1);
+
+      auto rb = [&](double x) {
+        meanlog = (1.0 - w) * x + ds_j * w;
+        return plnorm_cpp(cRB_hi, meanlog, sigma) - plnorm_cpp(cRB_lo, meanlog, sigma);
+      };
+
+      auto ra = [&](double x) {
+        meanlog = -(1.0 - w) * x + ds_j * w;
+        return plnorm_cpp(-cRA_hi, meanlog, sigma) - plnorm_cpp(-cRA_lo, meanlog, sigma);
+      };
+
       p_SB_RB(j, i) =
           N_SB_RB(j, i) > 0
               ?
               // P_SB_RB: stimulus B, response B - integrate [theta, Inf)
               // outer(1:nCond, 1:nRatings, P_SBRB) - normal indexing
-              gl_integrate(locB(j), theta, true,
-                           [&](double x) {
-                             meanlog = (1.0 - w) * x + ds_j * w;
-                             return plnorm_cpp(c_RB(i + 1), meanlog, sigma) -
-                                    plnorm_cpp(c_RB(i), meanlog, sigma);
-                           })
-              : p_SB_RB(j, i) = constants::MIN_P;
+              gl_integrate(theta, lB + trunc, lB, rb)
+              : constants::MIN_P;
       p_SB_RA(j, i_rev) =
           (N_SB_RA(j, i_rev) > 0)
               ?
               // P_SB_RA: stimulus B, response A - integrate (-Inf, theta]
               // R: outer(1:nCond, nRatings:1, P_SBRA) - REVERSED
-              gl_integrate(locB(j), theta, false,
-                           [&](double x) {
-                             meanlog = -(1.0 - w) * x + ds_j * w;
-                             return plnorm_cpp(-c_RA(i + 1), meanlog, sigma) -
-                                    plnorm_cpp(-c_RA(i), meanlog, sigma);
-                           })
+              gl_integrate(lB - trunc, theta, lB, ra)
               : constants::MIN_P;
       p_SA_RB(j, i) =
           (N_SA_RB(j, i) > 0)
               ?
               // P_SA_RB: stimulus A, response B - integrate [theta, Inf)
               // outer(1:nCond, 1:nRatings, P_SARB) - normal indexing
-              gl_integrate(locA(j), theta, true,
-                           [&](double x) {
-                             meanlog = (1.0 - w) * x + ds_j * w;
-                             return plnorm_cpp(c_RB(i + 1), meanlog, sigma) -
-                                    plnorm_cpp(c_RB(i), meanlog, sigma);
-                           })
+              gl_integrate(theta, lA + trunc, lA, rb)
               : constants::MIN_P;
       p_SA_RA(j, i_rev) =
           (N_SA_RA(j, i_rev) > 0)
               ?
               // P_SA_RA: stimulus A, response A - integrate (-Inf, theta]
               // R: outer(1:nCond, nRatings:1, P_SARA) - REVERSED
-              gl_integrate(locA(j), theta, false,
-                           [&](double x) {
-                             meanlog = -(1.0 - w) * x + ds_j * w;
-                             return plnorm_cpp(-c_RA(i + 1), meanlog, sigma) -
-                                    plnorm_cpp(-c_RA(i), meanlog, sigma);
-                           })
+              gl_integrate(lA - trunc, theta, lA, ra)
               : constants::MIN_P;
     }
   }

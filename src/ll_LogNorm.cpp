@@ -28,8 +28,6 @@ double ll_LogNorm_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
   arma::vec loc_RA(nRatings + 1);
   arma::vec loc_RB(nRatings + 1);
 
-  // loc_RA <-  c(Inf,log(abs(mu_cA - theta)) - .5*sigma^2, -Inf) # the order
-  // here is REVERSED!!! loc_RB <- c(-Inf, log(mu_cB - theta) - .5*sigma^2, Inf)
   const double sigma2_div2 = 0.5 * sigma * sigma;
   loc_RA(0) = arma::datum::inf;
   loc_RA(nRatings) = -arma::datum::inf;
@@ -47,45 +45,42 @@ double ll_LogNorm_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
   arma::mat p_SA_RB(nCond, nRatings);
   arma::mat p_SB_RA(nCond, nRatings);
   arma::mat p_SB_RB(nCond, nRatings);
+  
+  const double trunc = 7.0;
 
   for (int j = 0; j < nCond; j++) {
+    const double lB = locB(j), lA = locA(j);
     for (int i = 0; i < nRatings; i++) {
-      double diff;
+      const double locRB_lo = loc_RB(i), locRB_hi = loc_RB(i + 1);
+      const double locRA_lo = loc_RA(i), locRA_hi = loc_RA(i + 1);
+
+      auto rb = [&](double x) {
+        const double diff = x - theta;
+        return plnorm_cpp(diff, locRB_lo, sigma) -
+               plnorm_cpp(diff, locRB_hi, sigma);
+      };
+
+      auto ra = [&](double x) {
+        const double diff = theta - x;
+        return plnorm_cpp(diff, locRA_hi, sigma) -
+               plnorm_cpp(diff, locRA_lo, sigma);
+      };
+
       p_SB_RB(j, i) =
           (N_SB_RB(j, i) > 0)
-              ? gl_integrate(locB(j), theta, true,
-                             [&](double x) {
-                               diff = (x - theta);
-                               return plnorm_cpp(diff, loc_RB(i), sigma) -
-                                      plnorm_cpp(diff, loc_RB(i + 1), sigma);
-                             })
+              ? gl_integrate(theta, lB + trunc, lB, rb)
               : constants::MIN_P;
       p_SB_RA(j, i) =
           (N_SB_RA(j, i) > 0)
-              ? gl_integrate(locB(j), theta, false,
-                             [&](double x) {
-                               diff = theta - x;
-                               return plnorm_cpp(diff, loc_RA(i + 1), sigma) -
-                                      plnorm_cpp(diff, loc_RA(i), sigma);
-                             })
+              ? gl_integrate(lB - trunc, theta, lB, ra)
               : constants::MIN_P;
       p_SA_RA(j, i) =
           (N_SA_RA(j, i) > 0)
-              ? gl_integrate(locA(j), theta, false,
-                             [&](double x) {
-                               diff = theta - x;
-                               return plnorm_cpp(diff, loc_RA(i + 1), sigma) -
-                                      plnorm_cpp(diff, loc_RA(i), sigma);
-                             })
+              ? gl_integrate(lA - trunc, theta, lA, ra)
               : constants::MIN_P;
       p_SA_RB(j, i) =
           (N_SA_RB(j, i) > 0)
-              ? gl_integrate(locA(j), theta, true,
-                             [&](double x) {
-                               diff = (x - theta);
-                               return plnorm_cpp(diff, loc_RB(i), sigma) -
-                                      plnorm_cpp(diff, loc_RB(i + 1), sigma);
-                             })
+              ? gl_integrate(theta, lA + trunc, lA, rb)
               : constants::MIN_P;
     }
   }

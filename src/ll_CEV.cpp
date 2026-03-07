@@ -12,11 +12,6 @@ double ll_CEV_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
   const arma::vec locB = ds / 2.0;
   const double theta = p(nCond + nRatings - 1);
 
-  // R: c_RA <- c(-Inf, p[nCond+nRatings-1] -
-  // rev(cumsum(exp(p[(nCond+1):(nCond+nRatings-2)]))), p[nCond+nRatings-1],
-  // Inf) R: c_RB <- c(-Inf, p[nCond+nRatings+1], p[nCond+nRatings+1] +
-  // cumsum(exp(p[(nCond+nRatings+2):(nCond+nRatings*2-1)])), Inf)
-
   const double anchor_ra = p(nCond + nRatings - 2);
   const double anchor_rb = p(nCond + nRatings);
 
@@ -43,9 +38,7 @@ double ll_CEV_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
 
   const double sigma = std::exp(p(nCond + nRatings * 2 - 1));
   const double w_raw = p(nCond + nRatings * 2);
-  // const double w = std::exp(w_raw) / (1.0 + std::exp(w_raw));  // log
-  // transform to (0,1)
-  const double w = 1.0 / (1.0 + std::exp(-w_raw)); // avoid overflow
+  const double w = 1.0 / (1.0 + std::exp(-w_raw));
 
   // Probability matrices
   arma::mat p_SA_RA(nCond, nRatings);
@@ -53,45 +46,41 @@ double ll_CEV_cpp(const arma::vec &p, const arma::mat &N_SA_RA,
   arma::mat p_SB_RA(nCond, nRatings);
   arma::mat p_SB_RB(nCond, nRatings);
 
+  const double trunc = 7.0;
+
   for (int j = 0; j < nCond; j++) {
-    double ds_j = ds(j);
-    double mean_val;
+    const double ds_j = ds(j);
+    const double lB = locB(j), lA = locA(j);
+
     for (int i = 0; i < nRatings; i++) {
+      const double cRB_lo = c_RB(i), cRB_hi = c_RB(i + 1);
+      const double cRA_lo = c_RA(i), cRA_hi = c_RA(i + 1);
+
+      auto rb = [&](double x) {
+        const double mean_val = (1.0 - w) * x + w * ds_j;
+        return pnorm_cpp(cRB_hi, mean_val, sigma) - pnorm_cpp(cRB_lo, mean_val, sigma);
+      };
+
+      auto ra = [&](double x) {
+        const double mean_val = (1.0 - w) * x - w * ds_j;
+        return pnorm_cpp(cRA_hi, mean_val, sigma) - pnorm_cpp(cRA_lo, mean_val, sigma);
+      };
+
       p_SB_RB(j, i) =
           (N_SB_RB(j, i) > 0)
-              ? gl_integrate(locB(j), theta, true,
-                             [&](double x) {
-                               mean_val = (1.0 - w) * x + w * ds_j;
-                               return pnorm_cpp(c_RB(i + 1), mean_val, sigma) -
-                                      pnorm_cpp(c_RB(i), mean_val, sigma);
-                             })
+              ? gl_integrate(theta, lB + trunc, lB, rb)
               : constants::MIN_P;
       p_SB_RA(j, i) =
           (N_SB_RA(j, i) > 0)
-              ? gl_integrate(locB(j), theta, false,
-                             [&](double x) {
-                               mean_val = (1.0 - w) * x - w * ds_j;
-                               return pnorm_cpp(c_RA(i + 1), mean_val, sigma) -
-                                      pnorm_cpp(c_RA(i), mean_val, sigma);
-                             })
+              ? gl_integrate(lB - trunc, theta, lB, ra)
               : constants::MIN_P;
       p_SA_RA(j, i) =
           (N_SA_RA(j, i) > 0)
-              ? gl_integrate(locA(j), theta, false,
-                             [&](double x) {
-                               mean_val = (1.0 - w) * x - w * ds_j;
-                               return pnorm_cpp(c_RA(i + 1), mean_val, sigma) -
-                                      pnorm_cpp(c_RA(i), mean_val, sigma);
-                             })
+              ? gl_integrate(lA - trunc, theta, lA, ra)
               : constants::MIN_P;
       p_SA_RB(j, i) =
           (N_SA_RB(j, i) > 0)
-              ? gl_integrate(locA(j), theta, true,
-                             [&](double x) {
-                               mean_val = (1.0 - w) * x + w * ds_j;
-                               return pnorm_cpp(c_RB(i + 1), mean_val, sigma) -
-                                      pnorm_cpp(c_RB(i), mean_val, sigma);
-                             })
+              ? gl_integrate(theta, lA + trunc, lA, rb)
               : constants::MIN_P;
     }
   }
