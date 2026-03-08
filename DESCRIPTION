@@ -22,9 +22,9 @@ BugReports: https://github.com/ManuelRausch/StatConfR/issues
 Depends:
     R (>= 4.1.0)
 Imports:
-    RcppNumerical, Rcpp, parallel, plyr, stats, utils, ggplot2, Rmisc
+    Rcpp, parallel, plyr, stats, utils, ggplot2, Rmisc
 LinkingTo:
-    Rcpp, RcppArmadillo, RcppEigen, RcppNumerical
+    Rcpp, RcppArmadillo
 Suggests:
     testthat (>= 3.0.0)
 Date/Publication: 2023-09-12
