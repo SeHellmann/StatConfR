@@ -88,7 +88,7 @@ test_that("ll_SDTvarS_cpp matches R across configurations", {
   )
   for (cfg in configs) {
     inputs <- generate_sdtvars_inputs(cfg$nCond, cfg$nRatings, cfg$seed)
-    result <- compare_likelihood_generic(llSDTvarS, ll_SDTvarS_cpp, inputs)
+    result <- compare_likelihood_generic("SDTvarS", llSDTvarS, inputs)
     expect_true(result$match,
       info = sprintf("nCond=%d nRatings=%d seed=%d: R=%f C++=%f diff=%e",
                      cfg$nCond, cfg$nRatings, cfg$seed,
@@ -100,7 +100,7 @@ test_that("ll_SDTvarS_cpp handles edge cases", {
   base <- generate_sdtvars_inputs(nCond = 2, nRatings = 4, seed = 123)
   for (nm in names(sdtvars_edge_cases)) {
     inputs <- sdtvars_edge_cases[[nm]](base)
-    result <- compare_likelihood_generic(llSDTvarS, ll_SDTvarS_cpp, inputs, tolerance = 1e-8)
+    result <- compare_likelihood_generic("SDTvarS", llSDTvarS, inputs, tolerance = 1e-8)
     expect_true(is.finite(result$cpp_result), info = sprintf("'%s': result not finite", nm))
     expect_true(result$match,
       info = sprintf("'%s': R=%f C++=%f diff=%e", nm, result$r_result, result$cpp_result, result$difference))
@@ -110,7 +110,8 @@ test_that("ll_SDTvarS_cpp handles edge cases", {
 test_that("ll_SDTvarS_cpp output is finite, non-negative, and deterministic", {
   inputs <- generate_sdtvars_inputs(nCond = 2, nRatings = 4, seed = 123)
   call_cpp <- function(inp) {
-    ll_SDTvarS_cpp(inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
+    ptr <- get_sdtvars_ptr()
+    test_ll_ptr(ptr, inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
   }
   r1 <- call_cpp(inputs)
   expect_true(is.finite(r1))
@@ -121,7 +122,8 @@ test_that("ll_SDTvarS_cpp output is finite, non-negative, and deterministic", {
 test_that("ll_SDTvarS_cpp neglogL scales proportionally with data size", {
   inputs <- generate_sdtvars_inputs(nCond = 2, nRatings = 4, seed = 123)
   call_cpp <- function(inp) {
-    ll_SDTvarS_cpp(inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
+    ptr <- get_sdtvars_ptr()
+    test_ll_ptr(ptr, inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
   }
   r1 <- call_cpp(inputs)
   inputs2 <- inputs
@@ -136,7 +138,8 @@ test_that("ll_SDTvarS_cpp neglogL scales proportionally with data size", {
 test_that("ll_SDTvarS_cpp responds to variance parameter changes", {
   inputs <- generate_sdtvars_inputs(nCond = 2, nRatings = 4, seed = 123)
   call_cpp <- function(inp) {
-    ll_SDTvarS_cpp(inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
+    ptr <- get_sdtvars_ptr()
+    test_ll_ptr(ptr, inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
   }
   r1 <- call_cpp(inputs)
   inputs2 <- inputs
@@ -148,7 +151,8 @@ test_that("ll_SDTvarS_cpp responds to variance parameter changes", {
 test_that("ll_SDTvarS_cpp responds to sensitivity changes", {
   inputs <- generate_sdtvars_inputs(nCond = 2, nRatings = 4, seed = 123)
   call_cpp <- function(inp) {
-    ll_SDTvarS_cpp(inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
+    ptr <- get_sdtvars_ptr()
+    test_ll_ptr(ptr, inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
   }
   inputs_lo <- inputs; inputs_lo$p[1:inputs$nCond] <- rep(0.5, inputs$nCond)
   inputs_hi <- inputs; inputs_hi$p[1:inputs$nCond] <- rep(3.0, inputs$nCond)
@@ -161,7 +165,7 @@ test_that("ll_SDTvarS_cpp matches R across parameter grid", {
     for (nRatings in 2:5) {
       for (seed in c(111, 222, 333)) {
         inputs <- generate_sdtvars_inputs(nCond, nRatings, seed)
-        result <- compare_likelihood_generic(llSDTvarS, ll_SDTvarS_cpp, inputs)
+        result <- compare_likelihood_generic("SDTvarS", llSDTvarS, inputs)
         expect_true(result$match,
           info = sprintf("nCond=%d, nRatings=%d, seed=%d: diff=%e",
                          nCond, nRatings, seed, result$difference))
@@ -176,7 +180,10 @@ test_that("ll_SDTvarS_cpp is faster than R version", {
   inputs <- generate_sdtvars_inputs(nCond = 3, nRatings = 5, seed = 123)
   n_iter <- 100
   r_time   <- system.time(for (i in seq_len(n_iter)) llSDTvarS(inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond))["elapsed"]
-  cpp_time <- system.time(for (i in seq_len(n_iter)) ll_SDTvarS_cpp(inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond))["elapsed"]
+  cpp_time <- system.time(for (i in seq_len(n_iter)) {
+    ptr <- get_sdtvars_ptr()
+    test_ll_ptr(ptr, inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond)
+  })["elapsed"]
   message(sprintf("ll_SDTvarS - R: %.3fs, C++: %.3fs, speedup: %.1fx", r_time, cpp_time, r_time / cpp_time))
   expect_true(cpp_time < r_time, info = sprintf("R: %.3fs, C++: %.3fs", r_time, cpp_time))
 })

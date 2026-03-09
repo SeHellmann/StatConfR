@@ -94,3 +94,62 @@ fitSDT <-
     }
     res
   }
+
+
+fitSDT_fast <-
+  function(N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB,
+           nInits, nRestart, nRatings, nCond, nTrials){
+
+    # 1. Define Model Parameters
+    model_defs <- list(
+      grid = expand.grid(maxD = seq(1, 5, 1),
+                         theta = seq(-1/2, 1/2, 1/2),
+                         tauMin = seq(0.1, 1, length.out = 4),
+                         tauRange = seq(1, 5, length.out = 5)),
+      has_meta = FALSE,
+      meta_params = NULL,
+      anchor = "c",
+      steps_mode = "full"
+    )
+    inits <- prepare_accum_inits("SDT", nRatings, nCond, model_defs)
+    
+    # 2. Compute Likelihoods on Grid (Using C++ for speed)
+    fn_ptr <- get_sdt_ptr()
+    logL <- compute_generic_grid_ll(fn_ptr, as.matrix(inits), N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, nRatings, nCond)
+    
+    # 3. Select Best Initial Values
+    inits_top <- inits[order(logL)[1:nInits], , drop=FALSE]
+
+    # 4. Optimization Loop (Using C++ for speed)
+    fit_res <- optimize_generic_loop(fn_ptr, as.matrix(inits_top), 
+                                 N_SA_RA, N_SA_RB, N_SB_RA, N_SB_RB, 
+                                 nRestart, nRatings, nCond)
+
+    # 5. Post Processing
+    res <- process_accum_results(fit_res, "SDT", nRatings, nCond, nTrials, model_defs)
+    return(res)
+  }
+
+
+fitSDT_regression <- function(data, formulas, nInits, nRestart) {
+  
+  # 1. Prepare Input
+  prep <- preprocess_regression_input(data, formulas, model = "SDT", nInits = nInits)
+  
+  # 2. Optimization
+  fn_ptr <- get_sdt_regression_ptr()
+  
+  fit_res <- optimize_regression_loop(fn_ptr, 
+                                 as.matrix(prep$inits),
+                                 prep$X_list,
+                                 prep$stim_vec, 
+                                 prep$rating_vec, 
+                                 prep$correct_vec,
+                                 prep$counts_vec,
+                                 nRestart, prep$nRatings, prep$nTrials)
+  
+  # 3. Postprocess Results
+  res <- process_regression_results(fit_res, prep, prep$param_defs)
+  class(res) <- "sdt_fit"
+  return(res)
+}

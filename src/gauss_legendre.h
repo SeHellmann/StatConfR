@@ -41,15 +41,15 @@ constexpr const double GL_WEIGHTS[40] = {
 
 template <typename F>
 inline double gl_integrate(double lo, double hi, double loc, F &&integrand) {
-  if (hi <= lo) return 0.0;
-  double mid = (lo + hi) * 0.5;
-  double half = (hi - lo) * 0.5;
-  double sum = 0.0;
-  for (int k = 0; k < GL_ORDER; k++) {
-    double x = mid + half * GL_NODES[k];
-    double dnorm_val =
-        std::exp(-0.5 * (x - loc) * (x - loc)) * constants::INV_SQRT_2PI;
-    sum += GL_WEIGHTS[k] * dnorm_val * integrand(x);
-  }
-  return half * sum;
+    if (hi <= lo) return 0.0;
+    double mid = (lo + hi) * 0.5;
+    double half = (hi - lo) * 0.5;
+    double sum = 0.0;
+    for (int k = 0; k < GL_ORDER; k++) {
+        double x = mid + half * GL_NODES[k];
+        double dnorm_val =
+            std::exp(-0.5 * (x - loc) * (x - loc)) * constants::INV_SQRT_2PI;
+        sum += GL_WEIGHTS[k] * dnorm_val * integrand(x);
+    }
+    return half * sum;
 }

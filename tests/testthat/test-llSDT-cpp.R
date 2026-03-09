@@ -72,7 +72,7 @@ test_that("ll_SDT_cpp matches R across configurations", {
   )
   for (cfg in configs) {
     inputs <- generate_sdt_inputs(cfg$nCond, cfg$nRatings, cfg$seed)
-    result <- compare_likelihood_generic(llSDT, ll_SDT_cpp, inputs)
+    result <- compare_likelihood_generic("SDT", llSDT, inputs)
     expect_true(result$match,
       info = sprintf("nCond=%d nRatings=%d seed=%d: R=%f C++=%f diff=%e",
                      cfg$nCond, cfg$nRatings, cfg$seed,
@@ -84,7 +84,7 @@ test_that("ll_SDT_cpp handles edge cases", {
   base <- generate_sdt_inputs(nCond = 2, nRatings = 4, seed = 123)
   for (nm in names(sdt_edge_cases)) {
     inputs <- sdt_edge_cases[[nm]](base)
-    result <- compare_likelihood_generic(llSDT, ll_SDT_cpp, inputs, tolerance = 1e-8)
+    result <- compare_likelihood_generic("SDT", llSDT, inputs, tolerance = 1e-8)
     expect_true(is.finite(result$cpp_result), info = sprintf("'%s': result not finite", nm))
     expect_true(result$match,
       info = sprintf("'%s': R=%f C++=%f diff=%e", nm, result$r_result, result$cpp_result, result$difference))
@@ -94,7 +94,8 @@ test_that("ll_SDT_cpp handles edge cases", {
 test_that("ll_SDT_cpp output is finite, non-negative, and deterministic", {
   inputs <- generate_sdt_inputs(nCond = 2, nRatings = 4, seed = 123)
   call_cpp <- function(inp) {
-    ll_SDT_cpp(inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
+    ptr <- get_sdt_ptr()
+    test_ll_ptr(ptr, inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
   }
   r1 <- call_cpp(inputs)
   expect_true(is.finite(r1))
@@ -105,7 +106,8 @@ test_that("ll_SDT_cpp output is finite, non-negative, and deterministic", {
 test_that("ll_SDT_cpp neglogL scales proportionally with data size", {
   inputs <- generate_sdt_inputs(nCond = 2, nRatings = 4, seed = 123)
   call_cpp <- function(inp) {
-    ll_SDT_cpp(inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
+    ptr <- get_sdt_ptr()
+    test_ll_ptr(ptr, inp$p, inp$N_SA_RA, inp$N_SA_RB, inp$N_SB_RA, inp$N_SB_RB, inp$nRatings, inp$nCond)
   }
   r1 <- call_cpp(inputs)
   inputs2 <- inputs
@@ -122,7 +124,7 @@ test_that("ll_SDT_cpp matches R across parameter grid", {
     for (nRatings in 2:5) {
       for (seed in c(111, 222, 333)) {
         inputs <- generate_sdt_inputs(nCond, nRatings, seed)
-        result <- compare_likelihood_generic(llSDT, ll_SDT_cpp, inputs)
+        result <- compare_likelihood_generic("SDT", llSDT, inputs)
         expect_true(result$match,
           info = sprintf("nCond=%d, nRatings=%d, seed=%d: diff=%e",
                          nCond, nRatings, seed, result$difference))
@@ -137,7 +139,10 @@ test_that("ll_SDT_cpp is faster than R version", {
   inputs <- generate_sdt_inputs(nCond = 3, nRatings = 5, seed = 123)
   n_iter <- 100
   r_time   <- system.time(for (i in seq_len(n_iter)) llSDT(inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond))["elapsed"]
-  cpp_time <- system.time(for (i in seq_len(n_iter)) ll_SDT_cpp(inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond))["elapsed"]
+  cpp_time <- system.time(for (i in seq_len(n_iter)) {
+    ptr <- get_sdt_ptr()
+    test_ll_ptr(ptr, inputs$p, inputs$N_SA_RA, inputs$N_SA_RB, inputs$N_SB_RA, inputs$N_SB_RB, inputs$nRatings, inputs$nCond)
+  })["elapsed"]
   message(sprintf("ll_SDT - R: %.3fs, C++: %.3fs, speedup: %.1fx", r_time, cpp_time, r_time / cpp_time))
   expect_true(cpp_time < r_time, info = sprintf("R: %.3fs, C++: %.3fs", r_time, cpp_time))
 })
