@@ -67,13 +67,7 @@ double ll_LogNorm_cpp(const arma::vec& p, const ModelData& dat) {
         loc_RB(i + 1) = std::log(mu_cB(i) - theta) - sigma2_div2;
     }
 
-    // Probability matrices
-    arma::mat p_SA_RA(nCond, nRatings);
-    arma::mat p_SA_RB(nCond, nRatings);
-    arma::mat p_SB_RA(nCond, nRatings);
-    arma::mat p_SB_RB(nCond, nRatings);
-
-    const double trunc = 7.0;
+    double negLogL = 0.0;
 
     for (int j = 0; j < nCond; j++) {
         const double lB = locB(j), lA = locA(j);
@@ -81,26 +75,21 @@ double ll_LogNorm_cpp(const arma::vec& p, const ModelData& dat) {
             const double locRB_lo = loc_RB(i), locRB_hi = loc_RB(i + 1);
             const double locRA_lo = loc_RA(i), locRA_hi = loc_RA(i + 1);
 
-            p_SB_RB(j, i) =
-                (N_SB_RB(j, i) > 0)
-                    ? logNorm_cell(lB, theta, locRB_lo, locRB_hi, sigma, false)
-                    : constants::MIN_P;
-            p_SB_RA(j, i) =
-                (N_SB_RA(j, i) > 0)
-                    ? logNorm_cell(lB, theta, locRA_lo, locRA_hi, sigma, true)
-                    : constants::MIN_P;
-            p_SA_RA(j, i) =
-                (N_SA_RA(j, i) > 0)
-                    ? logNorm_cell(lA, theta, locRA_lo, locRA_hi, sigma, true)
-                    : constants::MIN_P;
-            p_SA_RB(j, i) =
-                (N_SA_RB(j, i) > 0)
-                    ? logNorm_cell(lA, theta, locRB_lo, locRB_hi, sigma, false)
-                    : constants::MIN_P;
+            if (N_SB_RB(j, i) > 0)
+                negLogL -= N_SB_RB(j, i) * clamped_log(
+                    logNorm_cell(lB, theta, locRB_lo, locRB_hi, sigma, false));
+            if (N_SB_RA(j, i) > 0)
+                negLogL -= N_SB_RA(j, i) * clamped_log(
+                    logNorm_cell(lB, theta, locRA_lo, locRA_hi, sigma, true));
+            if (N_SA_RA(j, i) > 0)
+                negLogL -= N_SA_RA(j, i) * clamped_log(
+                    logNorm_cell(lA, theta, locRA_lo, locRA_hi, sigma, true));
+            if (N_SA_RB(j, i) > 0)
+                negLogL -= N_SA_RB(j, i) * clamped_log(
+                    logNorm_cell(lA, theta, locRB_lo, locRB_hi, sigma, false));
         }
     }
-    return compute_negLogL(p_SA_RA, p_SA_RB, p_SB_RA, p_SB_RB, N_SA_RA, N_SA_RB,
-                           N_SB_RA, N_SB_RB);
+    return negLogL;
 }
 
 double ll_LogNorm_regression(const vec& p, const RegressionData& dat) {

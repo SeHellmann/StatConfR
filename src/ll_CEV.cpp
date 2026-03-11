@@ -59,13 +59,7 @@ double ll_CEV_cpp(const arma::vec& p, const ModelData& dat) {
     const double w_raw = p(nCond + nRatings * 2);
     const double w = 1.0 / (1.0 + std::exp(-w_raw));
 
-    // Probability matrices
-    arma::mat p_SA_RA(nCond, nRatings);
-    arma::mat p_SA_RB(nCond, nRatings);
-    arma::mat p_SB_RA(nCond, nRatings);
-    arma::mat p_SB_RB(nCond, nRatings);
-
-    const double trunc = 7.0;
+    double negLogL = 0.0;
 
     for (int j = 0; j < nCond; j++) {
         const double ds_j = ds(j);
@@ -75,26 +69,21 @@ double ll_CEV_cpp(const arma::vec& p, const ModelData& dat) {
             const double cRB_lo = c_RB(i), cRB_hi = c_RB(i + 1);
             const double cRA_lo = c_RA(i), cRA_hi = c_RA(i + 1);
 
-            p_SB_RB(j, i) =
-                (N_SB_RB(j, i) > 0)
-                    ? CEV_cell(lB, theta, cRB_lo, cRB_hi, w, ds_j, sigma, false)
-                    : constants::MIN_P;
-            p_SB_RA(j, i) =
-                (N_SB_RA(j, i) > 0)
-                    ? CEV_cell(lB, theta, cRA_lo, cRA_hi, w, ds_j, sigma, true)
-                    : constants::MIN_P;
-            p_SA_RA(j, i) =
-                (N_SA_RA(j, i) > 0)
-                    ? CEV_cell(lA, theta, cRA_lo, cRA_hi, w, ds_j, sigma, true)
-                    : constants::MIN_P;
-            p_SA_RB(j, i) =
-                (N_SA_RB(j, i) > 0)
-                    ? CEV_cell(lA, theta, cRB_lo, cRB_hi, w, ds_j, sigma, false)
-                    : constants::MIN_P;
+            if (N_SB_RB(j, i) > 0)
+                negLogL -= N_SB_RB(j, i) * clamped_log(
+                    CEV_cell(lB, theta, cRB_lo, cRB_hi, w, ds_j, sigma, false));
+            if (N_SB_RA(j, i) > 0)
+                negLogL -= N_SB_RA(j, i) * clamped_log(
+                    CEV_cell(lB, theta, cRA_lo, cRA_hi, w, ds_j, sigma, true));
+            if (N_SA_RA(j, i) > 0)
+                negLogL -= N_SA_RA(j, i) * clamped_log(
+                    CEV_cell(lA, theta, cRA_lo, cRA_hi, w, ds_j, sigma, true));
+            if (N_SA_RB(j, i) > 0)
+                negLogL -= N_SA_RB(j, i) * clamped_log(
+                    CEV_cell(lA, theta, cRB_lo, cRB_hi, w, ds_j, sigma, false));
         }
     }
-    return compute_negLogL(p_SA_RA, p_SA_RB, p_SB_RA, p_SB_RB, N_SA_RA, N_SA_RB,
-                           N_SB_RA, N_SB_RB);
+    return negLogL;
 }
 
 double ll_CEV_regression(const vec& p, const RegressionData& dat) {

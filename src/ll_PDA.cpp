@@ -56,14 +56,8 @@ double ll_PDA_cpp(const arma::vec& p, const ModelData& dat) {
 
     const double a = std::exp(p(nCond + nRatings * 2 - 1));
     const double sigma = std::sqrt(a);
-    const double trunc = 7.0;
-    const double K = trunc * sigma;
 
-    // Probability matrices
-    arma::mat p_SA_RA(nCond, nRatings);
-    arma::mat p_SA_RB(nCond, nRatings);
-    arma::mat p_SB_RA(nCond, nRatings);
-    arma::mat p_SB_RB(nCond, nRatings);
+    double negLogL = 0.0;
 
     for (int j = 0; j < nCond; j++) {
         const double lB = locB(j), lA = locA(j);
@@ -71,40 +65,21 @@ double ll_PDA_cpp(const arma::vec& p, const ModelData& dat) {
             const double cRB_lo = c_RB(i), cRB_hi = c_RB(i + 1);
             const double cRA_lo = c_RA(i), cRA_hi = c_RA(i + 1);
 
-            // For SB_RB (loc = lB, using c_RB):
-            const double rb_lo_B = std::max(theta, cRB_lo - lB * a - K);
-            const double rb_hi_B = std::min(lB + trunc, cRB_hi - lB * a + K);
-            // For SB_RA (loc = lB, using c_RA):
-            const double ra_lo_B = std::max(lB - trunc, cRA_lo - lB * a - K);
-            const double ra_hi_B = std::min(theta, cRA_hi - lB * a + K);
-            // For SA_RA (loc = lA, using c_RB):
-            const double rb_lo_A = std::max(theta, cRB_lo - lA * a - K);
-            const double rb_hi_A = std::min(lA + trunc, cRB_hi - lA * a + K);
-            // For SA_RB (loc = lA, using c_RA):
-            const double ra_lo_A = std::max(lA - trunc, cRA_lo - lA * a - K);
-            const double ra_hi_A = std::min(theta, cRA_hi - lA * a + K);
-
-            p_SB_RB(j, i) =
-                (N_SB_RB(j, i) > 0)
-                    ? PDA_cell(lB, theta, cRB_lo, cRB_hi, sigma, a, false)
-                    : constants::MIN_P;
-            p_SB_RA(j, i) =
-                (N_SB_RA(j, i) > 0)
-                    ? PDA_cell(lB, theta, cRA_lo, cRA_hi, sigma, a, true)
-                    : constants::MIN_P;
-            p_SA_RA(j, i) =
-                (N_SA_RA(j, i) > 0)
-                    ? PDA_cell(lA, theta, cRA_lo, cRA_hi, sigma, a, true)
-                    : constants::MIN_P;
-            p_SA_RB(j, i) =
-                (N_SA_RB(j, i) > 0)
-                    ? PDA_cell(lA, theta, cRB_lo, cRB_hi, sigma, a, false)
-                    : constants::MIN_P;
+            if (N_SB_RB(j, i) > 0)
+                negLogL -= N_SB_RB(j, i) * clamped_log(
+                    PDA_cell(lB, theta, cRB_lo, cRB_hi, sigma, a, false));
+            if (N_SB_RA(j, i) > 0)
+                negLogL -= N_SB_RA(j, i) * clamped_log(
+                    PDA_cell(lB, theta, cRA_lo, cRA_hi, sigma, a, true));
+            if (N_SA_RA(j, i) > 0)
+                negLogL -= N_SA_RA(j, i) * clamped_log(
+                    PDA_cell(lA, theta, cRA_lo, cRA_hi, sigma, a, true));
+            if (N_SA_RB(j, i) > 0)
+                negLogL -= N_SA_RB(j, i) * clamped_log(
+                    PDA_cell(lA, theta, cRB_lo, cRB_hi, sigma, a, false));
         }
     }
-
-    return compute_negLogL(p_SA_RA, p_SA_RB, p_SB_RA, p_SB_RB, N_SA_RA, N_SA_RB,
-                           N_SB_RA, N_SB_RB);
+    return negLogL;
 }
 
 double ll_PDA_regression(const vec& p, const RegressionData& dat) {

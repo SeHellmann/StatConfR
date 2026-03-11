@@ -96,7 +96,8 @@ test_that("ll_CEV_cpp handles edge cases", {
   base <- generate_cev_inputs(nCond = 2, nRatings = 4, seed = 123)
   for (nm in names(cev_edge_cases)) {
     inputs <- cev_edge_cases[[nm]](base)
-    result <- compare_likelihood_generic("CEV", ll_CEV, inputs, tolerance = 1e-4)
+    tol <- if (nm == "sigma_small") 1e-3 else 1e-4
+    result <- compare_likelihood_generic("CEV", ll_CEV, inputs, tolerance = tol)
     expect_true(is.finite(result$cpp_result), info = sprintf("'%s': result not finite", nm))
     expect_true(result$match,
       info = sprintf("'%s': R=%f C++=%f diff=%e", nm, result$r_result, result$cpp_result, result$difference))

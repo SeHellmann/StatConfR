@@ -56,16 +56,7 @@ double ll_Noisy_cpp(const arma::vec& p, const ModelData& dat) {
 
     const double sigma = std::exp(p(nCond + nRatings * 2 - 1));
 
-    // Probability matrices
-    arma::mat p_SA_RA(nCond, nRatings);
-    arma::mat p_SA_RB(nCond, nRatings);
-    arma::mat p_SB_RA(nCond, nRatings);
-    arma::mat p_SB_RB(nCond, nRatings);
-
-    // trunc = 7: dnorm(x; loc, 1) is negligible outside loc +/- 7
-    // K = 7*sigma: pnorm(c; x, sigma) transitions within c +/- K in x-space
-    const double trunc = 7.0;
-    const double K = trunc * sigma;
+    double negLogL = 0.0;
 
     for (int j = 0; j < nCond; j++) {
         const double lB = locB(j), lA = locA(j);
@@ -73,52 +64,21 @@ double ll_Noisy_cpp(const arma::vec& p, const ModelData& dat) {
             const double cRB_lo = c_RB(i), cRB_hi = c_RB(i + 1);
             const double cRA_lo = c_RA(i), cRA_hi = c_RA(i + 1);
 
-            const double rb_lo =
-                std::max(theta, cRB_lo - K);  // RB lower (theta split)
-            const double ra_hi =
-                std::min(theta, cRA_hi + K);  // RA upper (theta split)
-            const double rb_hi = cRB_hi + K;  // RB upper criterion side
-            const double ra_lo = cRA_lo - K;  // RA lower criterion side
-
-            /*
-            p_SB_RB(j, i) =
-                N_SB_RB(j, i) > 0
-                    ? gl_integrate(rb_lo, std::min(lB + trunc, rb_hi), lB, rb)
-                    : constants::MIN_P;
-            p_SA_RB(j, i) =
-                N_SA_RB(j, i) > 0
-                    ? gl_integrate(rb_lo, std::min(lA + trunc, rb_hi), lA, rb)
-                    : constants::MIN_P;
-            p_SB_RA(j, i) =
-                N_SB_RA(j, i) > 0
-                    ? gl_integrate(std::max(lB - trunc, ra_lo), ra_hi, lB, ra)
-                    : constants::MIN_P;
-            p_SA_RA(j, i) =
-                N_SA_RA(j, i) > 0
-                    ? gl_integrate(std::max(lA - trunc, ra_lo), ra_hi, lA, ra)
-                    : constants::MIN_P;
-          }
-                    */
-            p_SB_RB(j, i) =
-                (N_SB_RB(j, i) > 0)
-                    ? Noisy_cell(lB, theta, cRB_lo, cRB_hi, sigma, false)
-                    : constants::MIN_P;
-            p_SB_RA(j, i) =
-                (N_SB_RA(j, i) > 0)
-                    ? Noisy_cell(lB, theta, cRA_lo, cRA_hi, sigma, true)
-                    : constants::MIN_P;
-            p_SA_RA(j, i) =
-                (N_SA_RA(j, i) > 0)
-                    ? Noisy_cell(lA, theta, cRA_lo, cRA_hi, sigma, true)
-                    : constants::MIN_P;
-            p_SA_RB(j, i) =
-                (N_SA_RB(j, i) > 0)
-                    ? Noisy_cell(lA, theta, cRB_lo, cRB_hi, sigma, false)
-                    : constants::MIN_P;
+            if (N_SB_RB(j, i) > 0)
+                negLogL -= N_SB_RB(j, i) * clamped_log(
+                    Noisy_cell(lB, theta, cRB_lo, cRB_hi, sigma, false));
+            if (N_SB_RA(j, i) > 0)
+                negLogL -= N_SB_RA(j, i) * clamped_log(
+                    Noisy_cell(lB, theta, cRA_lo, cRA_hi, sigma, true));
+            if (N_SA_RA(j, i) > 0)
+                negLogL -= N_SA_RA(j, i) * clamped_log(
+                    Noisy_cell(lA, theta, cRA_lo, cRA_hi, sigma, true));
+            if (N_SA_RB(j, i) > 0)
+                negLogL -= N_SA_RB(j, i) * clamped_log(
+                    Noisy_cell(lA, theta, cRB_lo, cRB_hi, sigma, false));
         }
     }
-    return compute_negLogL(p_SA_RA, p_SA_RB, p_SB_RA, p_SB_RB, N_SA_RA, N_SA_RB,
-                           N_SB_RA, N_SB_RB);
+    return negLogL;
 }
 
 double ll_Noisy_regression(const vec& p, const RegressionData& dat) {

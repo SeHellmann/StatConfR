@@ -261,7 +261,7 @@
 fitConfModels <- function(data, models="all",
                          # diffCond = NULL, stimulus = NULL, correct = NULL, rating = NULL,
                           nInits = 5, nRestart = 4,
-                          .parallel=FALSE, n.cores=NULL) {
+                          .parallel=FALSE, n.cores=NULL, fast = FALSE) {
   AllModels <- c('WEV', 'SDT', 'IG', 'ITGc',
                  'ITGcm', 'GN', 'PDA', 'logN', 'logWEV', 'RCE', 'CAS') # if you implement additional models, add them here!
   if (identical(models,"all")) models <- AllModels
@@ -314,7 +314,7 @@ fitConfModels <- function(data, models="all",
     cur_sbj <- participant_id
     participant <- NULL # to omit a note in R checks because of an unbound variable
     data_part <- subset(data, participant==cur_sbj)
-    res <- fitConf(data_part, model = cur_model,  nInits = nInits, nRestart = nRestart)
+    res <- fitConf(data_part, model = cur_model,  nInits = nInits, nRestart = nRestart, fast = fast)
     res$model <- cur_model
     res$participant <- cur_sbj
     res[outnames[!(outnames %in% names(res))]] <- NA
@@ -337,7 +337,7 @@ fitConfModels <- function(data, models="all",
     if (is.null(n.cores)) n.cores <- min(nJobs, detectCores()-1)
 
     cl <- makeCluster(type="SOCK", n.cores)
-    clusterExport(cl, c("data",  "models", "outnames", "call_fitfct", "nInits", "nRestart"),
+    clusterExport(cl, c("data",  "models", "outnames", "call_fitfct", "nInits", "nRestart", "fast"),
                   envir = environment())
     # Following line ensures that the cluster is stopped even in cases of user
     # interrupt or errors

@@ -65,11 +65,7 @@ double ll_CAS_cpp(const arma::vec& p, const ModelData& dat) {
         c_RB.subvec(1, nRatings - 1) = arma::cumsum(arma::exp(p_rb));
     }
 
-    // Probability matrices
-    arma::mat p_SA_RA(nCond, nRatings);
-    arma::mat p_SA_RB(nCond, nRatings);
-    arma::mat p_SB_RA(nCond, nRatings);
-    arma::mat p_SB_RB(nCond, nRatings);
+    double negLogL = 0.0;
 
     for (int j = 0; j < nCond; j++) {
         const double lB = locB(j), lA = locA(j);
@@ -77,26 +73,21 @@ double ll_CAS_cpp(const arma::vec& p, const ModelData& dat) {
             const double cRB_lo = c_RB(i), cRB_hi = c_RB(i + 1);
             const double cRA_lo = c_RA(i), cRA_hi = c_RA(i + 1);
 
-            p_SB_RB(j, i) = (N_SB_RB(j, i) > 0)
-                                ? CASANDRE_cell(lB, theta, cRB_lo, cRB_hi,
-                                                meanlog, sdlog, false)
-                                : constants::MIN_P;
-            p_SB_RA(j, i) = (N_SB_RA(j, i) > 0)
-                                ? CASANDRE_cell(lB, theta, cRA_lo, cRA_hi,
-                                                meanlog, sdlog, true)
-                                : constants::MIN_P;
-            p_SA_RA(j, i) = (N_SA_RA(j, i) > 0)
-                                ? CASANDRE_cell(lA, theta, cRA_lo, cRA_hi,
-                                                meanlog, sdlog, true)
-                                : constants::MIN_P;
-            p_SA_RB(j, i) = (N_SA_RB(j, i) > 0)
-                                ? CASANDRE_cell(lA, theta, cRB_lo, cRB_hi,
-                                                meanlog, sdlog, false)
-                                : constants::MIN_P;
+            if (N_SB_RB(j, i) > 0)
+                negLogL -= N_SB_RB(j, i) * clamped_log(
+                    CASANDRE_cell(lB, theta, cRB_lo, cRB_hi, meanlog, sdlog, false));
+            if (N_SB_RA(j, i) > 0)
+                negLogL -= N_SB_RA(j, i) * clamped_log(
+                    CASANDRE_cell(lB, theta, cRA_lo, cRA_hi, meanlog, sdlog, true));
+            if (N_SA_RA(j, i) > 0)
+                negLogL -= N_SA_RA(j, i) * clamped_log(
+                    CASANDRE_cell(lA, theta, cRA_lo, cRA_hi, meanlog, sdlog, true));
+            if (N_SA_RB(j, i) > 0)
+                negLogL -= N_SA_RB(j, i) * clamped_log(
+                    CASANDRE_cell(lA, theta, cRB_lo, cRB_hi, meanlog, sdlog, false));
         }
     }
-    return compute_negLogL(p_SA_RA, p_SA_RB, p_SB_RA, p_SB_RB, N_SA_RA, N_SA_RB,
-                           N_SB_RA, N_SB_RB);
+    return negLogL;
 }
 
 double ll_CAS_regression(const vec& p, const RegressionData& dat) {

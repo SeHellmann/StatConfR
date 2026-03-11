@@ -60,12 +60,7 @@ double ll_LogWEV_cpp(const arma::vec& p, const ModelData& dat) {
     const double w_raw = p(nCond + nRatings * 2);
     const double w = 1.0 / (1.0 + std::exp(-w_raw));
 
-    // Probability matrices
-    arma::mat p_SA_RA(nCond, nRatings);
-    arma::mat p_SA_RB(nCond, nRatings);
-    arma::mat p_SB_RA(nCond, nRatings);
-    arma::mat p_SB_RB(nCond, nRatings);
-
+    double negLogL = 0.0;
     const double trunc = 7.0;
 
     for (int j = 0; j < nCond; ++j) {
@@ -75,42 +70,29 @@ double ll_LogWEV_cpp(const arma::vec& p, const ModelData& dat) {
             const int i_rev = nRatings - 1 - i;
             const double cRA_lo = c_RA(i), cRA_hi = c_RA(i + 1);
             const double cRB_lo = c_RB(i), cRB_hi = c_RB(i + 1);
-
-            p_SB_RB(j, i) =
-                N_SB_RB(j, i) > 0
-                    ?
-                    // P_SB_RB: stimulus B, response B - integrate [theta, Inf)
-                    // outer(1:nCond, 1:nRatings, P_SBRB) - normal indexing
-                    LogWEV_cell(lB, theta, cRB_lo, cRB_hi, w, ds_j, sigma,
-                                false)
-                    : constants::MIN_P;
-            p_SB_RA(j, i_rev) =
-                (N_SB_RA(j, i_rev) > 0)
-                    ?
-                    // P_SB_RA: stimulus B, response A - integrate (-Inf, theta]
-                    // R: outer(1:nCond, nRatings:1, P_SBRA) - REVERSED
-                    LogWEV_cell(lB, theta, cRA_lo, cRA_hi, w, ds_j, sigma, true)
-                    : constants::MIN_P;
-            p_SA_RB(j, i) =
-                (N_SA_RB(j, i) > 0)
-                    ?
-                    // P_SA_RB: stimulus A, response B - integrate [theta, Inf)
-                    // outer(1:nCond, 1:nRatings, P_SARB) - normal indexing
-                    LogWEV_cell(lA, theta, cRB_lo, cRB_hi, w, ds_j, sigma,
-                                false)
-                    : constants::MIN_P;
-            p_SA_RA(j, i_rev) =
-                (N_SA_RA(j, i_rev) > 0)
-                    ?
-                    // P_SA_RA: stimulus A, response A - integrate (-Inf, theta]
-                    // R: outer(1:nCond, nRatings:1, P_SARA) - REVERSED
-                    LogWEV_cell(lA, theta, cRA_lo, cRA_hi, w, ds_j, sigma, true)
-                    : constants::MIN_P;
+            // P_SB_RB: stimulus B, response B - integrate [theta, Inf)
+            if (N_SB_RB(j, i) > 0) {
+                negLogL -= N_SB_RB(j, i) * clamped_log(
+                    LogWEV_cell(lB, theta, cRB_lo, cRB_hi, w, ds_j, sigma, false));
+                }
+            // P_SB_RA: stimulus B, response A - integrate (-Inf, theta] - REVERSED indexing
+            if (N_SB_RA(j, i_rev) > 0) {
+                negLogL -= N_SB_RA(j, i_rev) * clamped_log(
+                    LogWEV_cell(lB, theta, cRA_lo, cRA_hi, w, ds_j, sigma, true));
+                }
+            // P_SA_RB: stimulus A, response B - integrate [theta, Inf)
+            if (N_SA_RB(j, i) > 0){
+                negLogL -= N_SA_RB(j, i) * clamped_log(
+                    LogWEV_cell(lA, theta, cRB_lo, cRB_hi, w, ds_j, sigma, false));
+                }
+            // P_SA_RA: stimulus A, response A - integrate (-Inf, theta] - REVERSED indexing
+            if (N_SA_RA(j, i_rev) > 0) {
+                negLogL -= N_SA_RA(j, i_rev) * clamped_log(
+                    LogWEV_cell(lA, theta, cRA_lo, cRA_hi, w, ds_j, sigma, true));
+                }
         }
     }
-
-    return compute_negLogL(p_SA_RA, p_SA_RB, p_SB_RA, p_SB_RB, N_SA_RA, N_SA_RB,
-                           N_SB_RA, N_SB_RB);
+    return negLogL;
 }
 
 double ll_LogWEV_regression(const vec& p, const RegressionData& dat) {

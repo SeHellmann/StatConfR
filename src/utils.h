@@ -24,14 +24,9 @@ namespace constants {
     constexpr double M1_SQRTPI = 0.5641895835477563; // 1/sqrt(pi)
 }
 
-arma::vec compute_sensitivity(const arma::vec& p, int nCond);
-
-double compute_negLogL(
-    const arma::mat& p_SA_RA, const arma::mat& p_SA_RB,
-    const arma::mat& p_SB_RA, const arma::mat& p_SB_RB,
-    const arma::mat& N_SA_RA, const arma::mat& N_SA_RB,
-    const arma::mat& N_SB_RA, const arma::mat& N_SB_RB
-);
+inline arma::vec compute_sensitivity(const arma::vec& p, int nCond) {
+    return arma::cumsum(arma::exp(p.subvec(0, nCond - 1)));
+}
 
 inline double pnorm_cpp(double x, double mu, double sigma) {
     return 0.5 * std::erfc(-(x - mu) / (sigma * M_SQRT2));
@@ -44,6 +39,12 @@ inline double plnorm_cpp(double q, double meanlog, double sdlog) {
 
 inline double normcdf_cpp(double z) {
     return 0.5 * std::erfc(-z * M_SQRT1_2);
+}
+
+inline double clamped_log(double p) {
+    if (std::isnan(p) || p < constants::MIN_P) return constants::LOG_MIN_P;
+    if (p > 1.0) return 0.0;
+    return std::log(p);
 }
 
 template <typename ProbCalc>

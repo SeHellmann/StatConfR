@@ -53,34 +53,26 @@ double ll_RCE_cpp(const arma::vec& p, const ModelData& dat) {
 
     const double sigma = std::sqrt(0.5);
 
-    mat p_SA_RA(nCond, nRatings, fill::zeros);
-    mat p_SA_RB(nCond, nRatings, fill::zeros);
-    mat p_SB_RA(nCond, nRatings, fill::zeros);
-    mat p_SB_RB(nCond, nRatings, fill::zeros);
+    double negLogL = 0.0;
 
     for (int j = 0; j < nCond; j++) {
+        const double half_ds = ds(j) / 2.0;
         for (int i = 0; i < nRatings; i++) {
-            p_SB_RB(j, i) =
-                (N_SB_RB(j, i) > 0)
-                    ? RCE_cell(ds(j) / 2.0, theta, sigma, c_RB(i), c_RB(i + 1))
-                    : constants::MIN_P;
-            p_SA_RB(j, i) = (N_SA_RB(j, i) > 0)
-                                ? RCE_cell(0.0, theta + ds(j) / 2.0, sigma,
-                                           c_RB(i), c_RB(i + 1))
-                                : constants::MIN_P;
-            p_SB_RA(j, i) = (N_SB_RA(j, i) > 0)
-                                ? RCE_cell(0.0, ds(j) / 2.0 - theta, sigma,
-                                           -c_RA(i + 1), -c_RA(i))
-                                : constants::MIN_P;
-            p_SA_RA(j, i) = (N_SA_RA(j, i) > 0)
-                                ? RCE_cell(ds(j) / 2.0, -theta, sigma,
-                                           -c_RA(i + 1), -c_RA(i))
-                                : constants::MIN_P;
+            if (N_SB_RB(j, i) > 0)
+                negLogL -= N_SB_RB(j, i) * clamped_log(
+                    RCE_cell(half_ds, theta, sigma, c_RB(i), c_RB(i + 1)));
+            if (N_SA_RB(j, i) > 0)
+                negLogL -= N_SA_RB(j, i) * clamped_log(
+                    RCE_cell(0.0, theta + half_ds, sigma, c_RB(i), c_RB(i + 1)));
+            if (N_SB_RA(j, i) > 0)
+                negLogL -= N_SB_RA(j, i) * clamped_log(
+                    RCE_cell(0.0, half_ds - theta, sigma, -c_RA(i + 1), -c_RA(i)));
+            if (N_SA_RA(j, i) > 0)
+                negLogL -= N_SA_RA(j, i) * clamped_log(
+                    RCE_cell(half_ds, -theta, sigma, -c_RA(i + 1), -c_RA(i)));
         }
     }
-
-    return compute_negLogL(p_SA_RA, p_SA_RB, p_SB_RA, p_SB_RB, N_SA_RA, N_SA_RB,
-                           N_SB_RA, N_SB_RB);
+    return negLogL;
 }
 
 double ll_RCE_regression(const vec& p, const RegressionData& dat) {
