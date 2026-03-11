@@ -9,8 +9,8 @@
 #
 # Skipped on CRAN and CI
 
-#skip_on_cran()
-#skip_on_ci()
+skip_on_cran()
+skip_on_ci()
 
 data(MaskOri, package = "statConfR")
 
