@@ -61,7 +61,6 @@ double ll_LogWEV_cpp(const arma::vec& p, const ModelData& dat) {
     const double w = 1.0 / (1.0 + std::exp(-w_raw));
 
     double negLogL = 0.0;
-    const double trunc = 7.0;
 
     for (int j = 0; j < nCond; ++j) {
         const double ds_j = ds(j);

@@ -84,6 +84,13 @@ double ll_RCE_regression(const vec& p, const RegressionData& dat) {
         double sigma = std::sqrt(0.5);
         bool is_stimA = (loc < 0.0);
 
+        // RCE logic rating criteria might extend past theta(widen to +/- inf) due to accumulator comparison
+        if(resp_A && upper_bound == theta) {
+            upper_bound = arma::datum::inf;
+        } else if (!resp_A && lower_bound == theta) {
+            lower_bound = -arma::datum::inf;
+        }
+
         if (resp_A) {
             // RCE logic maps RA integration from -upper_bound to -lower_bound
             double mu1 = is_stimA ? d / 2.0 : 0.0;

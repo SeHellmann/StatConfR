@@ -89,9 +89,11 @@ inline double compute_regression_negLogL(const arma::vec& p, const RegressionDat
     arma::vec c_vec = X_c * beta_c;
     
     double negLogL = 0.0;
+    // Per trial contributions to the negative log-likelihood
+    arma::vec contribs(nUniqueTrials, arma::fill::zeros);
     
     // Optimization Loop
-    #pragma omp parallel for reduction(+:negLogL) schedule(dynamic)
+    #pragma omp parallel for schedule(static)
     for (int k = 0; k < nUniqueTrials; ++k) {
         double d = d_vec(k);
         double theta = c_vec(k);
@@ -131,8 +133,9 @@ inline double compute_regression_negLogL(const arma::vec& p, const RegressionDat
         // Invoke the provided model-specific probability calculator
         double p_obs = calc_prob(resp_A, loc, theta, lower_bound, upper_bound, d, m_vals);
         
-        negLogL -= count * std::log(std::max(p_obs, constants::MIN_P));
+        contribs(k) = -count * std::log(std::max(p_obs, constants::MIN_P));
     }
     
+    negLogL = arma::accu(contribs);
     return negLogL;
 }
