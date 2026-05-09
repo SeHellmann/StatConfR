@@ -83,11 +83,19 @@ The regression pipeline follows the Generalized Linear Model (GLM) framework: re
 ```{r, eval=FALSE}
 fit_reg <- fitConf(part1,
                    model    = "WEV",
-                   formulas = list(d     = ~ diffCond,
+                   formulas = list(d     = ~ 0 + diffCond,
                                    c     = ~ 1,
                                    sigma = ~ 1,
                                    w     = ~ 1))
 ```
+
+#### Parameter Mapping and Formulas
+The regression interface uses standard R formulas to define the linear predictor for each parameter:
+
+- **Constant**: `~ 1` (default) fits a single intercept, meaning the parameter is fixed across all trials.
+- **Independent levels**: `~ 0 + diffCond` fits one independent coefficient per level. For example, if `diffCond` has 5 levels, this estimates 5 separate $d'$ values, equivalent to the aggregated fitting path.
+- **Treatment contrasts**: `~ diffCond` fits one intercept (the reference level) and coefficients representing the difference from that reference for the remaining levels.
+- **Continuous covariates**: `~ trialNo` performs a regression of the parameter on trial-level variables.
 
 Link functions are fixed per parameter so that the model's natural-scale constraints hold during optimization (`log` for `d`, `sigma`, `m`, `b`; `qlogis` for `w`; identity for `c`); the user specifies only the linear predictor.
 
