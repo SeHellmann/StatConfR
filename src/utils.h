@@ -93,7 +93,7 @@ inline double compute_regression_negLogL(const arma::vec& p, const RegressionDat
     arma::vec contribs(nUniqueTrials, arma::fill::zeros);
     
     // Optimization Loop
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(dynamic)
     for (int k = 0; k < nUniqueTrials; ++k) {
         double d = d_vec(k);
         double theta = c_vec(k);

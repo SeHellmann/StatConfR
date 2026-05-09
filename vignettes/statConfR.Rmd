@@ -1,0 +1,146 @@
+---
+title: "Fitting static confidence models with statConfR"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Fitting static confidence models with statConfR}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(statConfR)
+```
+
+`statConfR` fits static models of decision confidence derived from signal detection theory to data from binary discrimination tasks with confidence ratings, and computes measures of metacognition. The currently implemented models are SDT, GN, WEV, PDA, IG, ITGc, ITGcm, logN, logWEV, RCE, and CAS.
+
+This vignette is an example of asingle-participant workflow and displays the three fitting paths now available:
+
+1. The **original R path** (`fast = FALSE`, the default): grid search and optimizer in R, reference R likelihoods.
+2. The **C++ path** (`fast = TRUE`): Nelder-Mead optimizer and likelihood functions ported to C++ using Rcpp/Armadillo. Likelihood functions evaluated through `XPtr` function pointers, the fitting loop never returns to R during optimization.
+3. The **regression interface** (`formulas = list(...)`): enables mapping of data columns to model parameters via R formulas, so that a parameter can be held constant, allowed to vary between conditions, or regressed on continuous covariates, fit through a separate set of C++ regression likelihoods.
+
+The user-facing API is unchanged, the C++ path is usable with `fast = TRUE` input and produces the same output structure as the R path. Existing scripts that called `fitConf` / `fitConfModels` continue to work without modification.
+
+***********************************
+
+### Import data
+
+Import the `MaskOri` dataset included in the package. It contains 25,920 trials from 16 participants, for this example it's subset to a single participant.
+
+```{r}
+data("MaskOri")
+part1 <- subset(MaskOri, participant == 1,
+                select = c("diffCond", "stimulus", "correct", "rating"))
+head(part1)
+```
+
+The required columns are `diffCond`, `stimulus`, `correct`, and `rating`.
+
+***********************************
+
+### Fitting: the original R path
+
+A single model is fit to a single participant with `fitConf`. The default `fast = FALSE` runs the original R implementation: a coarse grid search over starting values, followed by `nInits` R optimizer() (Nelder-Mead) runs can be restarted up to`nRestart` times if optimization fails.
+
+```{r, eval=FALSE}
+fit_R <- fitConf(part1, model = "WEV", fast = FALSE)
+```
+
+This is the reference path.
+
+***********************************
+
+### Fitting: the new C++ path
+
+Setting `fast = TRUE` switches to the C++ implementation. Nelder-Mead optimizer and likelihood functions ported to C++ using Rcpp/Armadillo. Likelihood functions evaluated through `XPtr` function pointers, the fitting loop never returns to R during optimization. The call signature, return value, and resulting parameter estimates are the same as in the R path.
+
+```{r, eval=FALSE}
+fit_cpp <- fitConf(part1, model = "WEV", fast = TRUE)
+```
+
+The same `fast` flag is used for multiple model fitting with `fitConfModels`.
+
+```{r, eval=FALSE}
+fits <- fitConfModels(MaskOri,
+                      models   = c("SDT", "WEV"),
+                      fast     = TRUE,
+                      .parallel = TRUE)
+```
+
+***********************************
+
+### Fitting: the regression interface
+
+The regression pipeline follows the Generalized Linear Model (GLM) framework: regression coefficients (β) produce each parameter via a fixed link function. Through the standard R formula interface, a parameter can be made constant across all trials, allowed to vary between conditions, or regressed on continuous covariates. Passing `formulas` enables this pipeline; its names are model parameters (`d`, `c`, and depending on the model `sigma`, `w`, `m`, `b`). Confidence criteria cannot be mapped, and omitted parameters default to `~ 1` (intercept only).
+
+```{r, eval=FALSE}
+fit_reg <- fitConf(part1,
+                   model    = "WEV",
+                   formulas = list(d     = ~ diffCond,
+                                   c     = ~ 1,
+                                   sigma = ~ 1,
+                                   w     = ~ 1))
+```
+
+Link functions are fixed per parameter so that the model's natural-scale constraints hold during optimization (`log` for `d`, `sigma`, `m`, `b`; `qlogis` for `w`; identity for `c`); the user specifies only the linear predictor.
+
+***********************************
+
+For convenience in this vignette, previously fitted parameter set is used (loaded silently below) so the vignette renders without running the optimizer. In practice, `fits` from `fitConfModels` is the data frame the post-processing functions consume.
+
+```{r, echo=FALSE}
+fits <- data.frame(
+  model         = "WEV",
+  participant   = 1,
+  d_1           = 0.20, d_2 = 0.61, d_3 = 1.08, d_4 = 3.47, d_5 = 4.08,
+  c             = -0.30,
+  theta_minus.4 = -2.07, theta_minus.3 = -1.25,
+  theta_minus.2 = -0.42, theta_minus.1 =  0.13,
+  theta_plus.1  = -0.62, theta_plus.2  =  0.15,
+  theta_plus.3  =  1.40, theta_plus.4  =  2.19,
+  sigma         = 1.01,
+  w             = 0.54,
+  negLogLik = 2854.0, N = 1620, k = 16,
+  AIC = 5740.0, BIC = 5826.3, AICc = 5740.4
+)
+```
+
+### Post-processing: summary, prediction, model weights
+
+`summarizeFit` prints a structured overview of the fitted parameters, log-likelihood, and information criteria.
+
+```{r}
+summarizeFit(fits, model = "WEV", participant = 1)
+```
+
+`predictConf` turns fitted parameters into predicted response/rating probabilities for every combination of stimulus, response, difficulty condition, and confidence rating.
+
+```{r}
+pred <- predictConf(fits, model = "WEV")
+head(pred)
+```
+
+When several models have been fit to the same participant, `modelWeights` ranks them by an information criterion (AIC, BIC, or AICc) and displays relative weights that sum to 1 within each participant.
+
+```{r, eval=FALSE}
+modelWeights(fits, ic = "AIC")
+```
+
+***********************************
+
+### Plotting model fit
+
+`plotConfModelFit` can be used in the same way as the original implementation, it shows the empirical distribution of responses and confidence ratings as bars, with discriminability across rows and stimulus across columns, and overlays the model's predictions as dots.
+
+```{r, out.width="100%", fig.dim=c(7, 9)}
+plotConfModelFit(subset(MaskOri, participant == 1), fits, model = "WEV")
+```
+
+***********************************
